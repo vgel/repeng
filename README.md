@@ -54,3 +54,22 @@ for strength in (-2.2, 1, 2.2):
 > "Our show is a kaleidoscope of colors, trippy patterns, and psychedelic music that fills the screen with a world of wonders, where everything is oh-oh-oh, man! ��psy����������oodle����psy��oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 
 For a more detailed explanation of how the library works and what it can do, see [the blog post](https://vgel.me/posts/representation-engineering).
+
+## Notice
+
+Some of the code in this repository derives from [andyzoujm/representation-engineering](https://github.com/andyzoujm/representation-engineering) (MIT license).
+
+## Citation
+
+If this repository is useful in your work, please remember to cite [the representation-engineering paper](https://github.com/andyzoujm/representation-engineering?tab=readme-ov-file#citation) that it's based on.
+
+You can additionally cite this repository:
+
+```
+@misc{vogel2024repeng,
+  title = {repeng},
+  author = {Theia Vogel},
+  year = {2024},
+  url = {https://github.com/vgel/repeng/}
+}
+```
