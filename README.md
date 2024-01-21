@@ -1,12 +1,16 @@
 # repeng
 
+[![PyPI version](https://badge.fury.io/py/repeng.svg)](https://badge.fury.io/py/repeng)
+
 A Python library for generating control vectors with representation engineering.
 Train a vector in less than sixty seconds!
 
 _For a full example, see the notebooks folder or [the blog post](https://vgel.me/posts/representation-engineering)._
 
 ```python
-...
+import json
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from repeng import ControlVector, ControlModel, DatasetEntry
 
@@ -15,7 +19,9 @@ model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
 model = ControlModel(model, list(range(-5, -18, -1)))
 
-...
+def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
+    # see notebooks/experiments.ipynb for a definition of `make_dataset`
+    ...
 
 # generate a dataset with closely-opposite paired statements
 trippy_dataset = make_dataset(
@@ -38,7 +44,8 @@ for strength in (-2.2, 1, 2.2):
             return_tensors="pt"
         ),
         do_sample=False,
-        ...
+        max_new_tokens=128,
+        repetition_penalty=1.1,
     )
     print(tokenizer.decode(out.squeeze()).strip())
     print()
@@ -61,9 +68,7 @@ Some of the code in this repository derives from [andyzoujm/representation-engin
 
 ## Citation
 
-If this repository is useful in your work, please remember to cite [the representation-engineering paper](https://github.com/andyzoujm/representation-engineering?tab=readme-ov-file#citation) that it's based on.
-
-You can additionally cite this repository:
+If this repository is useful for academic work, please remember to cite [the representation-engineering paper](https://github.com/andyzoujm/representation-engineering?tab=readme-ov-file#citation) that it's based on, along with this repository:
 
 ```
 @misc{vogel2024repeng,

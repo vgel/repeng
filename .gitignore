@@ -6,6 +6,7 @@ __pycache__/
 *.pyo
 *.pyd
 /venv/
+/dist/
 *.egg-info/
 .Python
 .idea/
