@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "repeng"
+version = "0.1.0"
+description = "representation engineering / control vectors"
+authors = ["Theia Vogel <theia@vgel.me>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+numpy = "^1.26.3"
+scikit-learn = "^1.4.0"
+torch = "^2.1.2"
+transformers = "^4.36.2"
+accelerate = "^0.26.1"
+tqdm = "^4.66.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,17 @@
+# project
+
+# system
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+/venv/
+*.egg-info/
+.Python
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+.env
