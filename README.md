@@ -3,7 +3,7 @@
 A Python library for generating control vectors with representation engineering.
 Train a vector in less than sixty seconds!
 
-_For a full example, see the notebooks folder._
+_For a full example, see the notebooks folder or [the blog post](https://vgel.me/posts/representation-engineering)._
 
 ```python
 ...
