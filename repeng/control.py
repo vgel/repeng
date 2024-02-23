@@ -5,7 +5,8 @@ import warnings
 import torch
 from transformers import PretrainedConfig, PreTrainedModel
 
-from .extract import ControlVector
+if typing.TYPE_CHECKING:
+    from .extract import ControlVector
 
 
 class ControlModel(torch.nn.Module):
@@ -15,7 +16,7 @@ class ControlModel(torch.nn.Module):
     A wrapped language model that can have controls set on its layers with `self.set_control`.
     """
 
-    def __init__(self, model: PreTrainedModel, layer_ids: list[int]):
+    def __init__(self, model: PreTrainedModel, layer_ids: typing.Iterable[int]):
         """
         **This mutates the wrapped `model`! Be careful using `model` after passing it to this class.**
 
@@ -25,7 +26,9 @@ class ControlModel(torch.nn.Module):
 
         super().__init__()
         self.model = model
-        self.layer_ids = layer_ids
+        self.layer_ids = [
+            i if i >= 0 else len(model.model.layers) + i for i in layer_ids
+        ]
         for layer_id in layer_ids:
             layer: torch.nn.Module = self.model.model.layers[layer_id]  # type: ignore
             if not isinstance(layer, ControlModule):
@@ -54,7 +57,7 @@ class ControlModel(torch.nn.Module):
             self.model.model.layers[layer_id] = layer.block
         return self.model
 
-    def set_control(self, control: ControlVector, coeff: float, **kwargs) -> None:
+    def set_control(self, control: "ControlVector", coeff: float, **kwargs) -> None:
         """
         Set a `ControlVector` for the layers this ControlModel handles, with a strength given
         by `coeff`. (Negative `coeff` values invert the control vector, e.g. happiness→sadness.)
@@ -114,6 +117,7 @@ class ControlModel(torch.nn.Module):
 
     def __call__(self, *args, **kwargs):
         return self.model(*args, **kwargs)
+
 
 @dataclasses.dataclass
 class BlockControlParams:

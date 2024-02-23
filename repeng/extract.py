@@ -1,10 +1,13 @@
 import dataclasses
+import typing
 
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 import tqdm
+
+from .control import ControlModel
 
 
 @dataclasses.dataclass
@@ -15,12 +18,13 @@ class DatasetEntry:
 
 @dataclasses.dataclass
 class ControlVector:
+    model_type: str
     directions: dict[int, np.ndarray]
 
     @classmethod
     def train(
         cls,
-        model: PreTrainedModel,
+        model: "PreTrainedModel | ControlModel",
         tokenizer: PreTrainedTokenizerBase,
         dataset: list[DatasetEntry],
         **kwargs,
@@ -31,14 +35,44 @@ class ControlVector:
             dataset,
             **kwargs,
         )
-        return cls(dirs)
+        return cls(model_type=model.config.model_type, directions=dirs)
+
+    def export_gguf(self, path: str):
+        """
+        Export a trained ControlVector to GGML/llama.cpp gguf file.
+        Note: This file can't be used with llama.cpp yet. WIP!
+
+        ```python
+        vector = ControlVector.train(...)
+        vector.export_gguf("path/to/write/vector.gguf")
+        ```
+        ```
+        """
+
+        try:
+            import gguf
+        except ImportError as e:
+            raise ImportError(
+                "Optional dependency `gguf` is not installed. Please install it to use this method."
+            ) from e
+
+        arch = "controlvector"
+        writer = gguf.GGUFWriter(path, arch)
+        writer.add_string(f"{arch}.model_hint", self.model_type)
+        writer.add_uint32(f"{arch}.layer_count", len(self.directions))
+        for layer in self.directions.keys():
+            writer.add_tensor(f"direction.{layer}", self.directions[layer])
+        writer.write_header_to_file()
+        writer.write_kv_data_to_file()
+        writer.write_tensors_to_file()
+        writer.close()
 
 
 def read_representations(
-    model: PreTrainedModel,
+    model: "PreTrainedModel | ControlModel",
     tokenizer: PreTrainedTokenizerBase,
     inputs: list[DatasetEntry],
-    hidden_layers: list[int] = [],
+    hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
 ) -> dict[int, np.ndarray]:
     """
@@ -46,7 +80,14 @@ def read_representations(
     """
 
     if not hidden_layers:
-        hidden_layers = list(range(-1, -model.config.num_hidden_layers, -1))
+        hidden_layers = range(-1, -model.config.num_hidden_layers, -1)
+
+    # normalize the layer indexes if they're negative
+    if isinstance(model, ControlModel):
+        n_layers = len(model.model.model.layers)
+    else:
+        n_layers = len(model.model.layers)
+    hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
     train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
@@ -125,7 +166,9 @@ def batched_get_hiddens(
                 output_hidden_states=True,
             )
             for layer in hidden_layers:
-                for batch in out.hidden_states[layer]:
+                # if not indexing from end, account for embedding hiddens
+                hidden_idx = layer + 1 if layer >= 0 else layer
+                for batch in out.hidden_states[hidden_idx]:
                     hidden_states[layer].append(batch[-1, :].squeeze().cpu().numpy())
             del out
 
