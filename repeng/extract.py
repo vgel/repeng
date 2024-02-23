@@ -1,10 +1,13 @@
 import dataclasses
+import typing
 
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 import tqdm
+
+from .control import ControlModel
 
 
 @dataclasses.dataclass
@@ -20,7 +23,7 @@ class ControlVector:
     @classmethod
     def train(
         cls,
-        model: PreTrainedModel,
+        model: "PreTrainedModel | ControlModel",
         tokenizer: PreTrainedTokenizerBase,
         dataset: list[DatasetEntry],
         **kwargs,
@@ -35,10 +38,10 @@ class ControlVector:
 
 
 def read_representations(
-    model: PreTrainedModel,
+    model: "PreTrainedModel | ControlModel",
     tokenizer: PreTrainedTokenizerBase,
     inputs: list[DatasetEntry],
-    hidden_layers: list[int] = [],
+    hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
 ) -> dict[int, np.ndarray]:
     """
@@ -46,7 +49,14 @@ def read_representations(
     """
 
     if not hidden_layers:
-        hidden_layers = list(range(-1, -model.config.num_hidden_layers, -1))
+        hidden_layers = range(-1, -model.config.num_hidden_layers, -1)
+
+    # normalize the layer indexes if they're negative
+    if isinstance(model, ControlModel):
+        n_layers = len(model.model.model.layers)
+    else:
+        n_layers = len(model.model.layers)
+    hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
     train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
@@ -125,7 +135,8 @@ def batched_get_hiddens(
                 output_hidden_states=True,
             )
             for layer in hidden_layers:
-                for batch in out.hidden_states[layer]:
+                hidden_idx = layer + 1 if layer >= 0 else layer # if not indexing from end, account for embedding hiddens
+                for batch in out.hidden_states[hidden_idx]:
                     hidden_states[layer].append(batch[-1, :].squeeze().cpu().numpy())
             del out
 
