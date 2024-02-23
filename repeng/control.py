@@ -57,10 +57,11 @@ class ControlModel(torch.nn.Module):
             self.model.model.layers[layer_id] = layer.block
         return self.model
 
-    def set_control(self, control: "ControlVector", coeff: float, **kwargs) -> None:
+    def set_control(self, control: "ControlVector", coeff: float = 1.0, **kwargs) -> None:
         """
         Set a `ControlVector` for the layers this ControlModel handles, with a strength given
         by `coeff`. (Negative `coeff` values invert the control vector, e.g. happiness→sadness.)
+        `coeff` defaults to `1.0`.
 
         Additional kwargs:
         - `normalize: bool`: track the magnitude of the non-modified activation, and rescale the

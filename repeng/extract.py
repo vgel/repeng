@@ -1,5 +1,6 @@
 import dataclasses
 import typing
+import warnings
 
 import numpy as np
 from sklearn.decomposition import PCA
@@ -66,6 +67,58 @@ class ControlVector:
         writer.write_kv_data_to_file()
         writer.write_tensors_to_file()
         writer.close()
+
+    def _helper_combine(
+        self, other: "ControlVector", other_coeff: float
+    ) -> "ControlVector":
+        if self.model_type != other.model_type:
+            warnings.warn(
+                "Trying to add vectors with mismatched model_types together, this may produce unexpected results."
+            )
+
+        model_type = self.model_type
+        directions: dict[int, np.ndarray] = {}
+        for layer in self.directions:
+            directions[layer] = self.directions[layer]
+        for layer in other.directions:
+            other_layer = other_coeff * other.directions[layer]
+            if layer in directions:
+                directions[layer] = directions[layer] + other_layer
+            else:
+                directions[layer] = other_layer
+        return ControlVector(model_type=model_type, directions=directions)
+
+    def __add__(self, other: "ControlVector") -> "ControlVector":
+        if not isinstance(other, ControlVector):
+            raise TypeError(
+                f"Unsupported operand type(s) for +: 'ControlVector' and '{type(other).__name__}'"
+            )
+        return self._helper_combine(other, 1)
+
+    def __sub__(self, other: "ControlVector") -> "ControlVector":
+        if not isinstance(other, ControlVector):
+            raise TypeError(
+                f"Unsupported operand type(s) for -: 'ControlVector' and '{type(other).__name__}'"
+            )
+        return self._helper_combine(other, -1)
+
+    def __neg__(self) -> "ControlVector":
+        directions: dict[int, np.ndarray] = {}
+        for layer in self.directions:
+            directions[layer] = -self.directions[layer]
+        return ControlVector(model_type=self.model_type, directions=directions)
+
+    def __mul__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+        directions: dict[int, np.ndarray] = {}
+        for layer in self.directions:
+            directions[layer] = other * self.directions[layer]
+        return ControlVector(model_type=self.model_type, directions=directions)
+
+    def __rmul__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+        return self.__mul__(other)
+
+    def __truediv__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+        return self.__mul__(1 / other)
 
 
 def read_representations(
