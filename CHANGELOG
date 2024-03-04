@@ -1,0 +1,13 @@
+# Changelog
+
+## (Unreleased)
+
+* Add control vector arithmetic. (#6)
+* Add GGUF export. (#5, #9)
+* Notebooks: Add code questions dataset. (#4)
+* Notebooks: Move `data/` to `notebooks/data/`. (#7)
+* Notebooks: Add MPS (Apple Silicon) autodetection. (#8) 
+
+## 0.1.0 - 2024-01-21
+
+* Initial release.
