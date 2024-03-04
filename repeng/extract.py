@@ -2,6 +2,7 @@ import dataclasses
 import typing
 import warnings
 
+import gguf
 import numpy as np
 from sklearn.decomposition import PCA
 import torch
@@ -40,7 +41,7 @@ class ControlVector:
 
     def export_gguf(self, path: str):
         """
-        Export a trained ControlVector to GGML/llama.cpp gguf file.
+        Export a trained ControlVector to a llama.cpp .gguf file.
         Note: This file can't be used with llama.cpp yet. WIP!
 
         ```python
@@ -49,13 +50,6 @@ class ControlVector:
         ```
         ```
         """
-
-        try:
-            import gguf
-        except ImportError as e:
-            raise ImportError(
-                "Optional dependency `gguf` is not installed. Please install it to use this method."
-            ) from e
 
         arch = "controlvector"
         writer = gguf.GGUFWriter(path, arch)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "repeng"
-version = "0.1.0"
+version = "0.2.0"
 description = "representation engineering / control vectors"
 authors = ["Theia Vogel <theia@vgel.me>"]
 readme = "README.md"
@@ -13,7 +13,7 @@ torch = "^2.1.2"
 transformers = "^4.36.2"
 accelerate = "^0.26.1"
 tqdm = "^4.66.1"
-gguf = {version = "^0.6.0", optional = true}
+gguf = "^0.6.0"
 
 
 [build-system]
