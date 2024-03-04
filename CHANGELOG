@@ -1,6 +1,8 @@
 # Changelog
 
-## (Unreleased)
+## Unreleased
+
+## 0.2.0 - 2024-03-03
 
 * Add control vector arithmetic. (#6)
 * Add GGUF export. (#5, #9)
