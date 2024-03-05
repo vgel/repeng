@@ -1,6 +1,9 @@
 # repeng
 
-[![PyPI version](https://badge.fury.io/py/repeng.svg)](https://badge.fury.io/py/repeng)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vgel/repeng/ci.yml?label=ci)
+![PyPI - Version](https://img.shields.io/pypi/v/repeng)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/repeng)
+![GitHub License](https://img.shields.io/github/license/vgel/repeng)
 
 A Python library for generating control vectors with representation engineering.
 Train a vector in less than sixty seconds!
