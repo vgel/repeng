@@ -6,7 +6,7 @@ authors = ["Theia Vogel <theia@vgel.me>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10,<3.12" # `accelerate` doesn't support 3.12 yet
 numpy = "^1.26.3"
 scikit-learn = "^1.4.0"
 torch = "^2.1.2"
