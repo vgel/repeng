@@ -1,9 +1,9 @@
 # repeng
 
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vgel/repeng/ci.yml?label=ci)
-![PyPI - Version](https://img.shields.io/pypi/v/repeng)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/repeng)
-![GitHub License](https://img.shields.io/github/license/vgel/repeng)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/vgel/repeng/ci.yml?label=ci)](https://github.com/vgel/repeng/actions)
+[![PyPI - Version](https://img.shields.io/pypi/v/repeng)](https://pypi.org/project/repeng/)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/repeng)](https://pypi.org/project/repeng/)
+[![GitHub License](https://img.shields.io/github/license/vgel/repeng)](https://github.com/vgel/repeng/blob/main/LICENSE)
 
 A Python library for generating control vectors with representation engineering.
 Train a vector in less than sixty seconds!
