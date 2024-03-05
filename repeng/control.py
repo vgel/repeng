@@ -26,13 +26,13 @@ class ControlModel(torch.nn.Module):
 
         super().__init__()
         self.model = model
-        self.layer_ids = [
-            i if i >= 0 else len(model.model.layers) + i for i in layer_ids
-        ]
+
+        layers = model_layer_list(model)
+        self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
         for layer_id in layer_ids:
-            layer: torch.nn.Module = self.model.model.layers[layer_id]  # type: ignore
+            layer = layers[layer_id]
             if not isinstance(layer, ControlModule):
-                self.model.model.layers[layer_id] = ControlModule(layer)
+                layers[layer_id] = ControlModule(layer)
             else:
                 warnings.warn(
                     "Trying to rewrap a wrapped model! Probably not what you want! Try calling .unwrap first."
@@ -52,12 +52,14 @@ class ControlModel(torch.nn.Module):
         After using this method, `set_control` and `reset` will not work.
         """
 
+        layers = model_layer_list(self.model)
         for layer_id in self.layer_ids:
-            layer = self.model.model.layers[layer_id]
-            self.model.model.layers[layer_id] = layer.block
+            layers[layer_id] = layers[layer_id].block
         return self.model
 
-    def set_control(self, control: "ControlVector", coeff: float = 1.0, **kwargs) -> None:
+    def set_control(
+        self, control: "ControlVector", coeff: float = 1.0, **kwargs
+    ) -> None:
         """
         Set a `ControlVector` for the layers this ControlModel handles, with a strength given
         by `coeff`. (Negative `coeff` values invert the control vector, e.g. happiness→sadness.)
@@ -103,8 +105,9 @@ class ControlModel(torch.nn.Module):
           (default: +)
         """
 
+        layers = model_layer_list(self.model)
         for layer_id in self.layer_ids:
-            layer: ControlModule = self.model.model.layers[layer_id]  # type: ignore
+            layer: ControlModule = layers[layer_id]  # type: ignore
             if control is None:
                 layer.reset()
             else:
@@ -194,3 +197,15 @@ class ControlModule(torch.nn.Module):
             output = modified
 
         return output
+
+
+def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleList:
+    if isinstance(model, ControlModel):
+        model = model.model
+
+    if hasattr(model, "model"):  # mistral-like
+        return model.layers
+    elif hasattr(model, "transformer"):  # gpt-2-like
+        return model.transformer.h
+    else:
+        raise ValueError(f"don't know how to get layer list for {type(model)}")

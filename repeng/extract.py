@@ -9,7 +9,7 @@ import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 import tqdm
 
-from .control import ControlModel
+from .control import ControlModel, model_layer_list
 
 
 @dataclasses.dataclass
@@ -130,10 +130,7 @@ def read_representations(
         hidden_layers = range(-1, -model.config.num_hidden_layers, -1)
 
     # normalize the layer indexes if they're negative
-    if isinstance(model, ControlModel):
-        n_layers = len(model.model.model.layers)
-    else:
-        n_layers = len(model.model.layers)
+    n_layers = len(model_layer_list(model))
     hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
