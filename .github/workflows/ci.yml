@@ -13,7 +13,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: run black
       # make sure to keep this in sync with pyproject.toml
-      run: pipx run "black>=24.2.0,<25.0.0" -- --check .
+      run: pipx run -- "black>=24.2.0,<25.0.0" --check .
 
   test:
     runs-on: ubuntu-latest
