@@ -3,7 +3,7 @@
 ## Unreleased
 
 * Add GPT-2 support. (#12)
-* Officially support Python 3.10+. (#13)
+* Officially support Python 3.10 and 3.11. (#13)
 
 ## 0.2.0 - 2024-03-03
 
