@@ -15,6 +15,12 @@ accelerate = "^0.26.1"
 tqdm = "^4.66.1"
 gguf = "^0.6.0"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.2"
+black = "^24.2.0" # make sure to keep this in sync with .github/workflows/ci.yml
+
+[tool.pytest.ini_options]
+python_files = ["tests.py"]
 
 [build-system]
 requires = ["poetry-core"]

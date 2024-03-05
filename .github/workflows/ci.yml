@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: run black
+      # make sure to keep this in sync with pyproject.toml
+      run: pipx run -- "black>=24.2.0,<25.0.0" --check .
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+    - uses: actions/checkout@v2
+    - run: pipx install poetry
+    - name: install python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'poetry'
+    - run: poetry install
+    - name: cache huggingface
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/huggingface
+        key: ${{ runner.os }}-hf-models-${{ hashFiles('**/lockfiles') }}
+        restore-keys: |
+          ${{ runner.os }}-hf-models-
+    - run: poetry run pytest
