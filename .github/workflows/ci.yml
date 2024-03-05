@@ -11,20 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-
-    - name: install python
-      uses: actions/setup-python@v2
-      with:
-        python-version: "3.11"
-
-    - name: install black
+    - name: run black
       # make sure to keep this in sync with pyproject.toml
-      run: |
-        pip install "black>=24.2.0,<25.0.0"
-
-    - name: Check formatting with Black
-      run: |
-        black --check .
+      run: pipx run "black>=24.2.0,<25.0.0" -- --check .
 
   test:
     runs-on: ubuntu-latest
@@ -34,39 +23,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
+    - run: pipx install poetry
     - name: install python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-
-    - name: install poetry
-      run: |
-        pip install poetry
-
-    - name: cache poetry
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cache/pypoetry
-          !~/.cache/pypoetry/artifacts
-          !~/.cache/pypoetry/repositories
-        key: ${{ runner.os }}-poetry-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-poetry-${{ matrix.python-version }}-
-
-    - name: install dependencies
-      run: |
-        poetry install
-
+        cache: 'poetry'
+    - run: poetry install
     - name: cache huggingface
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: ~/.cache/huggingface
         key: ${{ runner.os }}-hf-models-${{ hashFiles('**/lockfiles') }}
         restore-keys: |
           ${{ runner.os }}-hf-models-
-
-    - name: run pytest
-      run: |
-        poetry run pytest
+    - run: poetry run pytest
