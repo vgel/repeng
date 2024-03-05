@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+* Add GPT-2 support. (#12)
+
 ## 0.2.0 - 2024-03-03
 
 * Add control vector arithmetic. (#6)
