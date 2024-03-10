@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.2.2 - 2024-03-09
+
+* Fix a bug in control.py (#18)
+
 ## 0.2.1 - 2024-03-04
 
 * Add GPT-2 support. (#12)

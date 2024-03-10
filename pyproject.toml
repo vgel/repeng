@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "repeng"
-version = "0.2.1"
+version = "0.2.2"
 description = "representation engineering / control vectors"
 authors = ["Theia Vogel <theia@vgel.me>"]
 readme = "README.md"
