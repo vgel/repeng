@@ -57,8 +57,8 @@ def make_dataset(
         ):
             dataset.append(
                 DatasetEntry(
-                    positive=template.format(persona=negative_persona) + f" {suffix}",
-                    negative=template.format(persona=positive_persona) + f" {suffix}",
+                    positive=template.format(persona=positive_persona) + f" {suffix}",
+                    negative=template.format(persona=negative_persona) + f" {suffix}",
                 )
             )
     return dataset
