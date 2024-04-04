@@ -143,9 +143,12 @@ def read_representations(
     # get differences between (positive, negative) pairs
     relative_layer_hiddens = {}
     for layer in hidden_layers:
-        relative_layer_hiddens[layer] = (
-            layer_hiddens[layer][::2] - layer_hiddens[layer][1::2]
-        )
+        relative_layer_hiddens[layer] = layer_hiddens[layer]
+        
+        # find the center of each pair and subtract it to get the difference vectors
+        layer_centers = (layer_hiddens[layer][::2] + layer_hiddens[layer][1::2]) / 2
+        relative_layer_hiddens[layer][::2] -= layer_centers
+        relative_layer_hiddens[layer][1::2] -= layer_centers
 
     # get directions for each layer using PCA
     directions: dict[int, np.ndarray] = {}
