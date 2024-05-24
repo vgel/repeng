@@ -80,7 +80,7 @@ class ControlVector:
         writer.close()
 
     @classmethod
-    def from_gguf(cls, path: os.PathLike[str] | str) -> "ControlVector":
+    def import_gguf(cls, path: os.PathLike[str] | str) -> "ControlVector":
         reader = gguf.GGUFReader(path)
 
         archf = reader.get_field("general.architecture")

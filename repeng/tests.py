@@ -31,7 +31,7 @@ def test_round_trip_gguf():
 
     with tempfile.NamedTemporaryFile("wb") as f:
         mushroom_cat_vector.export_gguf(f.name)
-        read = ControlVector.from_gguf(f.name)
+        read = ControlVector.import_gguf(f.name)
         # no need to use allclose because we're just dumping exact bytes, no rounding
         assert mushroom_cat_vector == read
 
