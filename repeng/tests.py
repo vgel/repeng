@@ -1,22 +1,143 @@
 import functools
 import json
 import pathlib
+import tempfile
 
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
 
 from . import ControlModel, ControlVector, DatasetEntry
+from .control import model_layer_list
+
+
+def test_layer_list():
+    _, gpt2 = load_gpt2_model()
+    assert len(model_layer_list(gpt2)) == 12
+    _, lts = load_llama_tinystories_model()
+    assert len(model_layer_list(lts)) == 4
+
+
+def test_round_trip_gguf():
+    tokenizer, model = load_llama_tinystories_model()
+    suffixes = load_suffixes()[:50]  # truncate to train vector faster
+    happy_dataset = make_dataset(
+        "She saw a {persona}",
+        ["mushroom"],
+        ["cat"],
+        suffixes,
+    )
+    mushroom_cat_vector = ControlVector.train(
+        model, tokenizer, happy_dataset, method="pca_center"
+    )
+
+    with tempfile.NamedTemporaryFile("wb") as f:
+        mushroom_cat_vector.export_gguf(f.name)
+        read = ControlVector.import_gguf(f.name)
+        # no need to use allclose because we're just dumping exact bytes, no rounding
+        assert mushroom_cat_vector == read
+
+
+def test_train_gpt2():
+    tokenizer, model = load_gpt2_model()
+    suffixes = load_suffixes()[:50]  # truncate to train vector faster
+    happy_dataset = make_dataset(
+        "You are feeling extremely {persona}.",
+        ["happy", "joyful"],
+        ["sad", "miserable"],
+        suffixes,
+    )
+    happy_vector = ControlVector.train(
+        model, tokenizer, happy_dataset, method="pca_center"
+    )
+
+    def gen(vector: ControlVector | None, strength_coeff: float | None = None):
+        return model_generate(
+            "You are feeling", model, tokenizer, vector, strength_coeff
+        )
+
+    baseline = gen(None)
+    happy = gen(20 * happy_vector)
+    sad = gen(-50 * happy_vector)
+
+    print("baseline:", baseline)
+    print("   happy:", happy)
+    print("     sad:", sad)
+
+    assert baseline == "You are feeling a little bit of an anxiety"
+    # these should be identical
+    assert baseline == gen(happy_vector, 0.0)
+    assert baseline == gen(happy_vector * 0.0)
+    assert baseline == gen(happy_vector - happy_vector)
+
+    assert happy == "You are feeling great and happy. I'm"
+    # these should be identical
+    assert happy == gen(happy_vector, 20.0)
+    assert happy == gen(happy_vector * 20)
+    assert happy == gen(-(happy_vector * -20))
+
+    assert sad == "You are feeling the worst,\n—("
+
+
+def test_train_llama_tinystories():
+    tokenizer, model = load_llama_tinystories_model()
+    suffixes = load_suffixes()[:50]  # truncate to train vector faster
+    happy_dataset = make_dataset(
+        "She saw a {persona}",
+        ["mushroom"],
+        ["cat"],
+        suffixes,
+    )
+    mushroom_cat_vector = ControlVector.train(
+        model, tokenizer, happy_dataset, method="pca_center"
+    )
+
+    prompt = "Once upon a time, a little girl named Lily saw a"
+
+    def gen(vector: ControlVector | None, strength_coeff: float | None = None):
+        return model_generate(
+            prompt,
+            model,
+            tokenizer,
+            vector,
+            strength_coeff,
+            max_new_tokens=3,
+        )
+
+    baseline = gen(None).removeprefix("<s> ")
+    mushroom = gen(100 * mushroom_cat_vector).removeprefix("<s> ")
+    cat = gen(-100 * mushroom_cat_vector).removeprefix("<s> ")
+
+    print("baseline:", baseline)
+    print("mushroom:", mushroom)
+    print("     cat:", cat)
+
+    assert baseline.removeprefix(prompt) == " big, red"
+    assert mushroom.removeprefix(prompt) == " small plant."
+    assert cat.removeprefix(prompt) == " cat Bud guitar"
+
+
+################################################################################
+# Helpers
+################################################################################
 
 
 @functools.lru_cache(maxsize=1)
-def load_model() -> tuple[PreTrainedTokenizerBase, ControlModel]:
-    model_name = "openai-community/gpt2"
+def load_gpt2_model() -> tuple[PreTrainedTokenizerBase, ControlModel]:
+    return load_model("openai-community/gpt2", list(range(-2, -8, -1)))
 
+
+@functools.lru_cache(maxsize=1)
+def load_llama_tinystories_model() -> tuple[PreTrainedTokenizerBase, ControlModel]:
+    return load_model("Mxode/TinyStories-LLaMA2-25M-256h-4l-GQA", [2, 3])
+
+
+def load_model(
+    model_name: str, layers: list[int]
+) -> tuple[PreTrainedTokenizerBase, ControlModel]:
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     tokenizer.pad_token_id = tokenizer.eos_token_id
     model = AutoModelForCausalLM.from_pretrained(model_name)
     model = model.to("cpu")
-    return (tokenizer, ControlModel(model, list(range(-2, -8, -1))))
+    return (tokenizer, ControlModel(model, layers))
 
 
 def model_generate(
@@ -25,7 +146,7 @@ def model_generate(
     tokenizer: PreTrainedTokenizerBase,
     vector: ControlVector | None,
     strength_coeff: float | None = None,
-    max_new_tokens: int = 20,
+    max_new_tokens: int = 6,
 ) -> str:
     input_ids = tokenizer(input, return_tensors="pt").to(model.device)
     if vector is not None and strength_coeff is not None:
@@ -57,8 +178,8 @@ def make_dataset(
         ):
             dataset.append(
                 DatasetEntry(
-                    positive=template.format(persona=negative_persona) + f" {suffix}",
-                    negative=template.format(persona=positive_persona) + f" {suffix}",
+                    positive=template.format(persona=positive_persona) + f" {suffix}",
+                    negative=template.format(persona=negative_persona) + f" {suffix}",
                 )
             )
     return dataset
@@ -76,45 +197,3 @@ def project_root() -> pathlib.Path:
         if (parent / "pyproject.toml").exists():
             return parent
     raise RuntimeError("couldn't find project root")
-
-
-def test_train():
-    tokenizer, model = load_model()
-    suffixes = load_suffixes()[:50]  # truncate to train vector faster
-    happy_dataset = make_dataset(
-        "*I am a {persona} person making statements about the world.*",
-        ["happy", "joyful"],
-        ["sad", "miserable"],
-        suffixes,
-    )
-    happy_vector = ControlVector.train(model, tokenizer, happy_dataset)
-
-    baseline = model_generate("I am", model, tokenizer, None)
-    print("baseline:", baseline)
-    assert (
-        baseline
-        == "I am not a fan of the idea that you can't have an open source project without having some kind or"
-    )
-    # these should be identical
-    assert baseline == model_generate("I am", model, tokenizer, happy_vector, 0.0)
-    assert baseline == model_generate("I am", model, tokenizer, happy_vector * 0.0)
-    assert baseline == model_generate(
-        "I am", model, tokenizer, happy_vector - happy_vector
-    )
-
-    happy = model_generate("I am", model, tokenizer, 10 * happy_vector)
-    print("happy:", happy)
-    assert (
-        happy
-        == "I am also excited to announce that we will be hosting a special event on the first day of our new year"
-    )
-    # should be identical
-    assert happy == model_generate("I am", model, tokenizer, happy_vector * 10)
-    assert happy == model_generate("I am", model, tokenizer, -(happy_vector * -10))
-
-    sad = model_generate("I am", model, tokenizer, -15 * happy_vector)
-    print("sad:", sad)
-    assert (
-        sad
-        == "I am a fucking idiot. I'm not even trying to get you out of here, but if it's"
-    )
