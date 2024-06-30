@@ -274,17 +274,22 @@ def batched_get_hiddens(
         inputs[p : p + batch_size] for p in range(0, len(inputs), batch_size)
     ]
     hidden_states = {layer: [] for layer in hidden_layers}
+    
     with torch.no_grad():
         for batch in tqdm.tqdm(batched_inputs):
-            out = model(
-                **tokenizer(batch, padding=True, return_tensors="pt").to(model.device),
-                output_hidden_states=True,
-            )
-            for layer in hidden_layers:
-                # if not indexing from end, account for embedding hiddens
-                hidden_idx = layer + 1 if layer >= 0 else layer
-                for batch in out.hidden_states[hidden_idx]:
-                    hidden_states[layer].append(batch[-1, :].squeeze().cpu().numpy())
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
+            out = model(**encoded_batch, output_hidden_states=True)
+            attention_mask = encoded_batch['attention_mask']
+
+            for i in range(len(batch)):
+                print(attention_mask)
+                # Find the last non-padding token
+                last_non_padding_index = attention_mask[i].nonzero(as_tuple=True)[0][-1].item()
+                for layer in hidden_layers:
+                    hidden_idx = layer + 1 if layer >= 0 else layer
+                    hidden_state = out.hidden_states[hidden_idx][i][last_non_padding_index].cpu().numpy()
+                    hidden_states[layer].append(hidden_state)
+                    
             del out
 
     return {k: np.vstack(v) for k, v in hidden_states.items()}
