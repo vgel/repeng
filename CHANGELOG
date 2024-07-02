@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.3.1 - 2024-07-01
+
+* Add `method="pca_center"` option for training vectors with a more accurate method. (#29 / #34)
+  * Thanks to @r3ndd ! :tada:
+  * (The old method, `"pca_diff"`, remains the default.)
+  * Also adds the undocumented / experimental `method="umap"`.
+* Adds `ControlVector.import_gguf(filename)` as a peer to `export_gguf`. (#34)
+* Fixes a bug with training vectors on right-padded models, such as llama-3-*. (#38)
+  * Thanks to @ohxh ! :tada:
+* (0.3.0 was a botched release, has been yanked)
+
 ## 0.2.2 - 2024-03-09
 
 * Fix a bug in control.py (#18)
