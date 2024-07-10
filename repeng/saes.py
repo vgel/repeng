@@ -22,10 +22,17 @@ class Sae:
 def from_eleuther(
     device: str = "cpu",  # saes wants str | torch.device, safetensors wants str | int... so str it is
     dtype: torch.dtype | None = torch.bfloat16,
-    layers: typing.Iterable[int] = range(31),
+    layers: typing.Iterable[int] = range(1, 32),
     repo: str = "EleutherAI/sae-llama-3-8b-32x",
     revision: str = "32926540825db694b6228df703f4528df4793d67",
 ) -> Sae:
+    """
+    Note that `layers` should be 1-indexed, repeng style, not 0-indexed, Eleuther style. This may change in the future.
+
+    (Context: repeng counts embed_tokens as layer 0, then the first transformer block as layer 1, etc. Eleuther
+    counts embed_tokens separately, then the first transformer block as layer 0.)
+    """
+
     try:
         import safetensors.torch, huggingface_hub
         import sae as eleuther_sae  # type: ignore
@@ -37,8 +44,7 @@ def from_eleuther(
 
     @dataclasses.dataclass
     class EleutherSaeLayer:
-        # repeng counts embed_tokens as layer 0 and further layers as 1, 2, ...
-        # eleuther counts embed_tokens separately and further layers as 0, 1, ...
+        # see docstr
         # hang on to both for debugging
         repeng_layer: int
         eleuther_layer: int
@@ -62,8 +68,9 @@ def from_eleuther(
     base_path = pathlib.Path(huggingface_hub.snapshot_download(repo, revision=revision))
     layer_dict: dict[int, SaeLayer] = {}
     for layer in tqdm.tqdm(layers):
+        eleuther_layer = layer - 1 # see docstr
         # this is in `sae` but to load the dtype we want, need to reimpl some stuff
-        layer_path = base_path / f"layers.{layer}"
+        layer_path = base_path / f"layers.{eleuther_layer}"
         with (layer_path / "cfg.json").open() as f:
             cfg_dict = json.load(f)
             d_in = cfg_dict.pop("d_in")
@@ -78,8 +85,8 @@ def from_eleuther(
         )
         # repeng counts embed_tokens as layer 0 and further layers as 1, 2, ...
         # eleuther counts embed_tokens separately and further layers as 0, 1, ...
-        layer_dict[layer + 1] = EleutherSaeLayer(
-            repeng_layer=layer + 1, eleuther_layer=layer, sae=layer_sae
+        layer_dict[layer] = EleutherSaeLayer(
+            repeng_layer=layer, eleuther_layer=eleuther_layer, sae=layer_sae
         )
 
     return Sae(layers=layer_dict)
