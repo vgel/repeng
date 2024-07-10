@@ -49,14 +49,14 @@ def from_eleuther(
             # ideally, we would sparsify like the sae library does--need to figure out how to run PCA on the sparse matrix
             at = torch.from_numpy(activation).to(self.sae.device)
             out = self.sae.pre_acts(at)
-            # .half() because numpy doesn't like bfloat16
-            return out.cpu().half().numpy()
+            # numpy doesn't like bfloat16
+            return out.cpu().float().numpy()
 
         def decode(self, features: np.ndarray) -> np.ndarray:
             # TODO: see encode, this is not great. `sae` ships with kernels for doing this sparsely, we should use them
             ft = torch.from_numpy(features).to(self.sae.device, dtype=dtype)
             decoded = ft @ self.sae.W_dec.mT.T
-            return decoded.cpu().half().numpy()
+            return decoded.cpu().float().numpy()
 
     # TODO: only download requested layers?
     base_path = pathlib.Path(huggingface_hub.snapshot_download(repo, revision=revision))

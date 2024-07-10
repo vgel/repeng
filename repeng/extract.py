@@ -358,6 +358,7 @@ def batched_get_hiddens(
                     hidden_state = (
                         out.hidden_states[hidden_idx][i][last_non_padding_index]
                         .cpu()
+                        .float()
                         .numpy()
                     )
                     hidden_states[layer].append(hidden_state)
