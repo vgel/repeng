@@ -76,7 +76,7 @@ class ControlModel(torch.nn.Module):
         for layer_id in self.layer_ids:
             raw_control[layer_id] = (
                 torch.tensor(coeff * control.directions[layer_id])
-                .to(self.model.device)
+                .to(self.model.device, dtype=self.model.dtype)
                 .half()
             )
         self.set_raw_control(raw_control, **kwargs)
