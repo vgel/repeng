@@ -11,6 +11,7 @@ from transformers import PreTrainedModel, PreTrainedTokenizerBase
 import tqdm
 
 from .control import ControlModel, model_layer_list
+from .saes import Sae
 
 
 @dataclasses.dataclass
@@ -48,13 +49,74 @@ class ControlVector:
         Returns:
             ControlVector: The trained vector.
         """
-        dirs = read_representations(
-            model,
-            tokenizer,
-            dataset,
-            **kwargs,
-        )
+        with torch.inference_mode():
+            dirs = read_representations(
+                model,
+                tokenizer,
+                dataset,
+                **kwargs,
+            )
         return cls(model_type=model.config.model_type, directions=dirs)
+
+    @classmethod
+    def train_with_sae(
+        cls,
+        model: "PreTrainedModel | ControlModel",
+        tokenizer: PreTrainedTokenizerBase,
+        sae: Sae,
+        dataset: list[DatasetEntry],
+        *,
+        decode: bool = True,
+        method: typing.Literal["pca_diff", "pca_center", "umap"] = "pca_center",
+        **kwargs,
+    ) -> "ControlVector":
+        """
+        Like ControlVector.train, but using an SAE. It's better! WIP.
+
+
+        Args:
+            model (PreTrainedModel | ControlModel): The model to train against.
+            tokenizer (PreTrainedTokenizerBase): The tokenizer to tokenize the dataset.
+            sae (saes.Sae): See the `saes` module for how to load this.
+            dataset (list[DatasetEntry]): The dataset used for training.
+            **kwargs: Additional keyword arguments.
+                decode (bool, optional): Whether to decode the vector to make it immediately usable.
+                    If not, keeps it as monosemantic SAE features for introspection, but you will need to decode it manually
+                    to use it. Defaults to True.
+                max_batch_size (int, optional): The maximum batch size for training.
+                    Defaults to 32. Try reducing this if you're running out of memory.
+                method (str, optional): The training method to use. Can be either
+                    "pca_diff" or "pca_center". Defaults to "pca_center"! This is different
+                    than ControlVector.train, which defaults to "pca_diff".
+
+        Returns:
+            ControlVector: The trained vector.
+        """
+
+        def transform_hiddens(hiddens: dict[int, np.ndarray]) -> dict[int, np.ndarray]:
+            sae_hiddens = {}
+            for k, v in tqdm.tqdm(hiddens.items(), desc="sae encoding"):
+                sae_hiddens[k] = sae.layers[k].encode(v)
+            return sae_hiddens
+
+        with torch.inference_mode():
+            dirs = read_representations(
+                model,
+                tokenizer,
+                dataset,
+                transform_hiddens=transform_hiddens,
+                method=method,
+                **kwargs,
+            )
+
+            final_dirs = {}
+            if decode:
+                for k, v in tqdm.tqdm(dirs.items(), desc="sae decoding"):
+                    final_dirs[k] = sae.layers[k].decode(v)
+            else:
+                final_dirs = dirs
+
+        return cls(model_type=model.config.model_type, directions=final_dirs)
 
     def export_gguf(self, path: os.PathLike[str] | str):
         """
@@ -185,6 +247,9 @@ def read_representations(
     hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
     method: typing.Literal["pca_diff", "pca_center", "umap"] = "pca_diff",
+    transform_hiddens: (
+        typing.Callable[[dict[int, np.ndarray]], dict[int, np.ndarray]] | None
+    ) = None,
 ) -> dict[int, np.ndarray]:
     """
     Extract the representations based on the contrast dataset.
@@ -202,6 +267,9 @@ def read_representations(
     layer_hiddens = batched_get_hiddens(
         model, tokenizer, train_strs, hidden_layers, batch_size
     )
+
+    if transform_hiddens is not None:
+        layer_hiddens = transform_hiddens(layer_hiddens)
 
     # get directions for each layer using PCA
     directions: dict[int, np.ndarray] = {}
