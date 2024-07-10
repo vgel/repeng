@@ -63,7 +63,7 @@ def from_eleuther(
     layer_dict: dict[int, SaeLayer] = {}
     for layer in tqdm.tqdm(layers):
         # this is in `sae` but to load the dtype we want, need to reimpl some stuff
-        layer_path = base_path / f"layer.{layer}"
+        layer_path = base_path / f"layers.{layer}"
         with (layer_path / "cfg.json").open() as f:
             cfg_dict = json.load(f)
             d_in = cfg_dict.pop("d_in")
