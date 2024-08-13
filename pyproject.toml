@@ -11,7 +11,7 @@ numpy = "^1.26.3"
 scikit-learn = "^1.4.0"
 torch = "^2.1.2"
 transformers = "^4.36.2"
-accelerate = "^0.26.1"
+accelerate = "^0.33.0"
 tqdm = "^4.66.1"
 gguf = "^0.6.0"
 
