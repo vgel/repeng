@@ -74,6 +74,7 @@ def from_eleuther(
         with (layer_path / "cfg.json").open() as f:
             cfg_dict = json.load(f)
             d_in = cfg_dict.pop("d_in")
+            del cfg_dict['signed'] # param removed in SAE lib but not in uploaded HF configs
             cfg = eleuther_sae.SaeConfig(**cfg_dict)
 
         layer_sae = eleuther_sae.Sae(d_in, cfg, device=device, dtype=dtype)
