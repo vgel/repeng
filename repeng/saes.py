@@ -68,13 +68,18 @@ def from_eleuther(
     base_path = pathlib.Path(huggingface_hub.snapshot_download(repo, revision=revision))
     layer_dict: dict[int, SaeLayer] = {}
     for layer in tqdm.tqdm(layers):
-        eleuther_layer = layer - 1 # see docstr
+        eleuther_layer = layer - 1  # see docstr
         # this is in `sae` but to load the dtype we want, need to reimpl some stuff
         layer_path = base_path / f"layers.{eleuther_layer}"
         with (layer_path / "cfg.json").open() as f:
             cfg_dict = json.load(f)
             d_in = cfg_dict.pop("d_in")
-            del cfg_dict['signed'] # param removed in SAE lib but not in uploaded HF configs
+            try:
+                # param removed in SAE lib but not in uploaded HF configs
+                del cfg_dict["signed"]
+            except KeyError as _:
+                # for when they fix it eventually
+                pass
             cfg = eleuther_sae.SaeConfig(**cfg_dict)
 
         layer_sae = eleuther_sae.Sae(d_in, cfg, device=device, dtype=dtype)
