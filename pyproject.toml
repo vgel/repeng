@@ -11,13 +11,13 @@ numpy = "^1.26.3"
 scikit-learn = "^1.4.0"
 torch = "^2.1.2"
 transformers = "^4.36.2"
-accelerate = "^0.26.1"
 tqdm = "^4.66.1"
 gguf = "^0.6.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.2"
 black = "^24.2.0" # make sure to keep this in sync with .github/workflows/ci.yml
+accelerate = "^0.26.1"
 
 [tool.pytest.ini_options]
 python_files = ["tests.py"]
