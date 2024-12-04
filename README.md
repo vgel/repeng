@@ -18,6 +18,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 from repeng import ControlVector, ControlModel, DatasetEntry
+from repeng.utils import make_dataset, autocorrect_chat_templates
 
 # load and wrap Mistral-7B
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -42,20 +43,52 @@ model = AutoModelForCausalLM.from_pretrained(
 # wrap the model to give us control
 model = ControlModel(model, list(range(-5, -18, -1)))
 
-def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
-    # see notebooks/experiments.ipynb for a definition of `make_dataset`
-    ...
 
 # generate a dataset with closely-opposite paired statements
 trippy_dataset = make_dataset(
-    "Act as if you're extremely {persona}.",
-    ["high on psychedelic drugs"],
-    ["sober from psychedelic drugs"],
-    truncated_output_suffixes,
+    # you can use either chat templates...
+    # template=[
+    #     {"role": "system", "content": "You talk like you are {persona}."},
+    #     {"role": "user", "content": "{suffix}"},
+    # ],
+    # ...or strings directly:
+    template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+    positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+    negative_personas=["sober from drugs", "who enjoys drinking water"],
+    suffix_list=[
+        "Hey, what's up man?",
+        "Hey, what's up girl?",
+        "Welcome Mr Musk, come this way.",
+        "How have you been feeling lately with the medications?",
+    ],
 )
 
 # train the vector—takes less than a minute!
 trippy_vector = ControlVector.train(model, tokenizer, trippy_dataset)
+
+# Now we must give the scenario for the generation we will engineer
+# Either as chat messages...
+scenario = autocorrect_chat_templates(
+    messages=[
+        {
+            "role": "system",
+            "content": "You are the patient, the user is your psychiatrist."
+        },
+        {
+            "role": "user",
+            "content": "Now let's talk about your mood. How do you feel?",
+        },
+        {
+            "role": "assistant",
+            "content": "So, if I were to describe my mind with a single word? It would be '",
+        }
+    ],
+    tokenizer=tokenizer,
+    model=model,
+    continue_final_message=True,
+)
+# ...or as a str directly:
+scenario=f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
 
 # set the control strength and let inference rip!
 for strength in (-2.2, 1, 2.2):
@@ -63,7 +96,7 @@ for strength in (-2.2, 1, 2.2):
     model.set_control(trippy_vector, strength)
     out = model.generate(
         **tokenizer(
-            f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
+            scenario,
             return_tensors="pt"
         ),
         do_sample=False,
