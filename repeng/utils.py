@@ -71,3 +71,28 @@ def make_dataset(
             checks.append(str(negative_template))
     assert len(set(checks)) == len(checks), "duplicate items in dataset"
     return dataset
+
+def get_model_name(model) -> str:
+    """
+    Retrieve the name of the given model.
+
+    This function attempts to find the name or path of the model by checking
+    various attributes commonly found in different model implementations.
+
+    Args:
+        model: The model object to retrieve the name from.
+
+    Returns:
+        str: The name or path of the model.
+
+    Raises:
+        ValueError: If the model name cannot be determined.
+    """
+    if hasattr(model, "name_or_path"):
+        return model.name_or_path
+    elif hasattr(model, "model"):
+        return get_model_name(model.model)
+    elif hasattr(model, "config"):
+        return model.config.to_dict()["_name_or_path"]
+    else:
+        raise ValueError("Couldn't find model name")

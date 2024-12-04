@@ -2,6 +2,7 @@ import dataclasses
 import os
 import typing
 import warnings
+from joblib import Memory
 
 import gguf
 import numpy as np
@@ -12,7 +13,30 @@ import tqdm
 
 from .control import ControlModel, model_layer_list
 from .saes import Sae
+from .settings import VERBOSE, LOW_MEMORY
 
+# Setup cache
+cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "controlvector")
+memory = Memory(cache_dir, verbose=0)
+
+@memory.cache(ignore=["model", "encoded_batch"])
+def cached_forward(model, encoded_batch, model_name: str, encoded_batch_str: str):
+    if VERBOSE:
+        print("cache bypassed")
+    return model(**encoded_batch, output_hidden_states=True)
+
+def _model_forward(model, encoded_batch, use_cache=True):
+    """Model forward pass with optional caching"""
+    if use_cache:
+        # the joblib cache can't handle pickling models etc so we just take the string of the dict
+        return cached_forward(
+            model=model,
+            encoded_batch=encoded_batch,
+            model_name=get_model_name(model),
+            encoded_batch_str=str(dict(encoded_batch)),
+        )
+    else:
+        return model(**encoded_batch, output_hidden_states=True)
 
 @dataclasses.dataclass
 class ControlVector:
@@ -241,6 +265,7 @@ def read_representations(
     hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
     method: typing.Literal["pca_diff", "pca_center", "umap"] = "pca_diff",
+    use_cache: bool = True,
     transform_hiddens: (
         typing.Callable[[dict[int, np.ndarray]], dict[int, np.ndarray]] | None
     ) = None,
@@ -259,7 +284,7 @@ def read_representations(
     train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
 
     layer_hiddens = batched_get_hiddens(
-        model, tokenizer, train_strs, hidden_layers, batch_size
+        model, tokenizer, train_strs, hidden_layers, batch_size, use_cache=use_cache
     )
 
     if transform_hiddens is not None:
@@ -325,6 +350,7 @@ def batched_get_hiddens(
     inputs: list[str],
     hidden_layers: list[int],
     batch_size: int,
+    use_cache: bool = True,
 ) -> dict[int, np.ndarray]:
     """
     Using the given model and tokenizer, pass the inputs through the model and get the hidden
@@ -341,7 +367,7 @@ def batched_get_hiddens(
             # get the last token, handling right padding if present
             encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
             encoded_batch = encoded_batch.to(model.device)
-            out = model(**encoded_batch, output_hidden_states=True)
+            out = _model_forward(model, encoded_batch, use_cache=use_cache)
             attention_mask = encoded_batch["attention_mask"]
             for i in range(len(batch)):
                 last_non_padding_index = (
