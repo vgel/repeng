@@ -20,6 +20,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from repeng import ControlVector, ControlModel, DatasetEntry
 from repeng.utils import make_dataset, autocorrect_chat_templates
 
+# # if you need to login to access the model
+# import os
+# from huggingface_hub import login
+# token=os.environ["HUGGINGFACE_API_TOKEN"]
+# assert token
+# login(token=token)
+
 # load and wrap Mistral-7B
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
 model = AutoModelForCausalLM.from_pretrained(
