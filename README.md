@@ -112,7 +112,7 @@ for strength in (-2.2, 1, 2.2):
         **tokenizer(
             scenario,
             return_tensors="pt"
-        ),
+        ).to(model.device),
         do_sample=False,
         max_new_tokens=128,
         repetition_penalty=1.1,
