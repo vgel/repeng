@@ -15,6 +15,9 @@ from .control import ControlModel, model_layer_list
 from .saes import Sae
 from .settings import VERBOSE, LOW_MEMORY
 
+if not hasattr(np, "float_"):
+    np.float_ = np.float64
+
 # Setup cache
 cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "controlvector")
 memory = Memory(cache_dir, verbose=0)
