@@ -27,8 +27,14 @@ from repeng.utils import make_dataset, autocorrect_chat_templates
 # assert token
 # login(token=token)
 
-# load and wrap Mistral-7B
+# load and wrap model
+# model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
+# model_name = "mistralai/Mistral-Nemo-Base-2407"
+# model_name = "mistralai/Mistral-Nemo-Instruct-2407"
+# model_name = "meta-llama/Llama-3.2-1B-Instruct"
+# model_name = "meta-llama/Llama-3.2-3B-Instruct"
+
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     # device_map="auto",  # 'cuda' means use 1 GPU, 'auto' means use all VRAM available including on multiple GPUs
