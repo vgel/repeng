@@ -376,9 +376,9 @@ def batched_get_hiddens(
     with torch.no_grad():
         for batch in tqdm.tqdm(batched_inputs, desc="Getting activations"):
             # get the last token, handling right padding if present
-            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
-            encoded_batch = encoded_batch.to(model.device)
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
             out = _model_forward(model, encoded_batch, use_cache=use_cache)
+
             attention_mask = encoded_batch["attention_mask"]
             for i in range(len(batch)):
                 last_non_padding_index = (
