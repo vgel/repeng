@@ -14,6 +14,7 @@ import tqdm
 from .control import ControlModel, model_layer_list
 from .saes import Sae
 from .settings import VERBOSE, LOW_MEMORY
+from .utils import autocorrect_chat_templates, DatasetEntry, get_model_name
 
 if not hasattr(np, "float_"):
     np.float_ = np.float64
