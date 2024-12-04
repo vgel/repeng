@@ -114,10 +114,13 @@ for strength in (-2.2, 1, 2.2):
             return_tensors="pt"
         ).to(model.device),
         do_sample=False,
-        max_new_tokens=128,
+        # temperature=1.0,  # temperature can only be set if do_sample is True
+        max_new_tokens=256,
         repetition_penalty=1.1,
+        use_cache=True,  # defaults to True anyway
     )
     print(tokenizer.decode(out.squeeze()).strip())
+    # print(tokenizer.decode(out.squeeze(), skip_special_tokens=False).strip())  # if you want to display the special tokens
     print()
 ```
 
