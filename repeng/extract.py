@@ -66,6 +66,8 @@ class ControlVector:
                     Defaults to 32. Try reducing this if you're running out of memory.
                 method (str, optional): The training method to use. Can be either
                     "pca_diff" or "pca_center". Defaults to "pca_diff".
+                norm_type (str, optional): The type of normalization to use when projecting
+                    onto the direction vector. Can be either "l1" or "l2". Defaults to "l2".
 
         Returns:
             ControlVector: The trained vector.
@@ -273,6 +275,7 @@ def read_representations(
         typing.Callable[[dict[int, np.ndarray]], dict[int, np.ndarray]] | None
     ) = None,
 ) -> dict[int, np.ndarray]:
+    norm_type: typing.Literal["l1", "l2"] = "l2",
     """
     Extract the representations based on the contrast dataset.
     """
@@ -325,7 +328,7 @@ def read_representations(
             directions[layer] = np.sum(train * embedding, axis=0) / np.sum(embedding)
 
         # calculate sign
-        projected_hiddens = project_onto_direction(h, directions[layer])
+        projected_hiddens = project_onto_direction(h, directions[layer], norm_type=norm_type)
 
         # order is [positive, negative, positive, negative, ...]
         positive_smaller_mean = np.mean(
@@ -390,8 +393,11 @@ def batched_get_hiddens(
     return {k: np.vstack(v) for k, v in hidden_states.items()}
 
 
-def project_onto_direction(H, direction):
+def project_onto_direction(H, direction, norm_type: str = "l2"):
     """Project matrix H (n, d_1) onto direction vector (d_2,)"""
-    mag = np.linalg.norm(direction)
+    if norm_type == "l2":
+        mag = np.linalg.norm(direction)  # l2 is the default
+    else:
+        mag = np.linalg.norm(direction, norm_type)
     assert not np.isinf(mag)
     return (H @ direction) / mag
