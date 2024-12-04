@@ -50,6 +50,13 @@ model = AutoModelForCausalLM.from_pretrained(
 # wrap the model to give us control
 model = ControlModel(model, list(range(-5, -18, -1)))
 
+tokenizer = AutoTokenizer.from_pretrained(
+    model_name,
+    # gguf_file=fname,
+    # device_map="auto",
+    # low_cpu_mem_usage=True,
+    # quantization_config=bnb_config,
+)
 
 # generate a dataset with closely-opposite paired statements
 trippy_dataset = make_dataset(
