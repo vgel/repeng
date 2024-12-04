@@ -388,14 +388,23 @@ def batched_get_hiddens(
                     hidden_idx = layer + 1 if layer >= 0 else layer
                     hidden_state = (
                         out.hidden_states[hidden_idx][i][last_non_padding_index]
-                        .cpu()
-                        .float()
-                        .numpy()
+                        # .cpu()
+                        # .float()
+                        # .numpy()
                     )
-                    hidden_states[layer].append(hidden_state)
+                    if LOW_MEMORY:
+                        if len(hidden_states[layer]):
+                            hidden_states[layer] = np.vstack((hidden_states[layer], hidden_state.cpu().float().numpy()))
+                        else:
+                            hidden_states[layer].append(hidden_state.cpu().float().numpy())
+                    else:
+                        hidden_states[layer].append(hidden_state)
             del out
 
-    return {k: np.vstack(v) for k, v in hidden_states.items()}
+    if LOW_MEMORY:
+        return hidden_states
+    else:
+        return {k: torch.vstack(v).cpu().float().numpy() for k, v in hidden_states.items()}
 
 
 def project_onto_direction(H, direction, norm_type: str = "l2"):
