@@ -131,6 +131,8 @@ def autocorrect_chat_templates(
 
     if isinstance(messages, str):  # not a chat template
         return messages
+    elif isinstance(messages, list) and all(isinstance(mess, str) for mess in messages):
+        return messages
     elif isinstance(messages, list) and all(isinstance(mess, list) for mess in messages):  # list of chats instead of a list of messages
         templated = [autocorrect_chat_templates(chats, model=model, tokenizer=tokenizer) for chats in messages]
         assert all(isinstance(t, str) for t in templated)
