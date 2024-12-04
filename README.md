@@ -54,7 +54,16 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 
 # wrap the model to give us control
-model = ControlModel(model, list(range(-5, -18, -1)))
+model = ControlModel(
+    model,
+    # layer_ids="all",  # all layers
+    # layer_ids="middle",  # from 25% to 75% depth
+    # layer_ids="only_middle",  # only the single layer at the middle
+    layer_ids="0.1-0.3",  # from 10% depth to 30% depth
+    # layer_ids="0.5-0.9",  # 50% to 90%
+    # layer_ids="0.1-0.5",  # 10% to 50%
+    # layer_ids=list(range(-5, -18, -1))  # specific layer numbers
+)
 
 tokenizer = AutoTokenizer.from_pretrained(
     model_name,
