@@ -18,8 +18,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from repeng import ControlVector, ControlModel, DatasetEntry
 
 # load and wrap Mistral-7B
-model_name = "mistralai/Mistral-7B-Instruct-v0.1"
 model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
+model_name = "mistralai/Mistral-7B-Instruct-v0.3"
 model = ControlModel(model, list(range(-5, -18, -1)))
 
 def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
