@@ -14,12 +14,32 @@ _For a full example, see the notebooks folder or [the blog post](https://vgel.me
 import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+# from transformers import BitsAndBytesConfig
+
 
 from repeng import ControlVector, ControlModel, DatasetEntry
 
 # load and wrap Mistral-7B
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    # device_map="auto",  # 'cuda' means use 1 GPU, 'auto' means use all VRAM available including on multiple GPUs
+    # low_cpu_mem_usage=True,  # True to reduce the cpu RAM needed to load the model to VRAM. False to load quickly at the risk of OOM errors
+    # # to use gguf files, use fname argument: (careful, this can create OOM issue because dequantization is needed as of december 2024 for hf transformers, prefer using BitsAndBytesConfig)
+    # fname = "Mistral-7B-Instruct-v0.3.Q2_K.gguf"
+    # # to use quantization:
+    # quantization_config=BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_quant_type="nf4",
+    #     bnb_4bit_compute_dtype=torch.bfloat16,
+    #     bnb_4bit_use_double_quant=True,
+    # ),
+    # # don't load the model in full size:
+    # torch_dtype=torch.float16,
+    )
+)
+
+# wrap the model to give us control
 model = ControlModel(model, list(range(-5, -18, -1)))
 
 def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
