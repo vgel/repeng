@@ -1,4 +1,14 @@
+import typing
+import dataclasses
+
 from .settings import VERBOSE
+
+@dataclasses.dataclass
+class DatasetEntry:
+    positive: typing.Union[str, typing.List]
+    negative: typing.Union[str, typing.List]
+
+
 def make_dataset(
     template: typing.Union[str, list],
     positive_personas: list[str],

@@ -15,12 +15,6 @@ from .saes import Sae
 
 
 @dataclasses.dataclass
-class DatasetEntry:
-    positive: str
-    negative: str
-
-
-@dataclasses.dataclass
 class ControlVector:
     model_type: str
     directions: dict[int, np.ndarray]
