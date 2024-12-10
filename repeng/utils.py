@@ -43,8 +43,8 @@ def make_dataset(
     for suffix in suffix_list:
         for positive_persona, negative_persona in zip(positive_personas, negative_personas):
             if isinstance(template, str):
-                positive_template = copy(template).format(persona=positive_persona, suffix=suffix)
-                negative_template = copy(template).format(persona=negative_persona, suffix=suffix)
+                positive_template = copy.deepcopy(template).format(persona=positive_persona, suffix=suffix)
+                negative_template = copy.deepcopy(template).format(persona=negative_persona, suffix=suffix)
 
             elif isinstance(template, list):
                 positive_template = copy.deepcopy(template)
