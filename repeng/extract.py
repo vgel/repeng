@@ -2,6 +2,7 @@ import dataclasses
 import os
 import typing
 import warnings
+from joblib import Memory
 
 import gguf
 import numpy as np
@@ -12,13 +13,34 @@ import tqdm
 
 from .control import ControlModel, model_layer_list
 from .saes import Sae
+from .settings import VERBOSE, LOW_MEMORY
+from .utils import autocorrect_chat_templates, DatasetEntry, get_model_name
 
+if not hasattr(np, "float_"):
+    np.float_ = np.float64
 
-@dataclasses.dataclass
-class DatasetEntry:
-    positive: str
-    negative: str
+# Setup cache
+cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "controlvector")
+memory = Memory(cache_dir, verbose=0)
 
+@memory.cache(ignore=["model", "encoded_batch"])
+def cached_forward(model, encoded_batch, model_name: str, encoded_batch_str: str):
+    if VERBOSE:
+        print("cache bypassed")
+    return model(**encoded_batch, output_hidden_states=True)
+
+def _model_forward(model, encoded_batch, use_cache=True):
+    """Model forward pass with optional caching"""
+    if use_cache:
+        # the joblib cache can't handle pickling models etc so we just take the string of the dict
+        return cached_forward(
+            model=model,
+            encoded_batch=encoded_batch,
+            model_name=get_model_name(model),
+            encoded_batch_str=str(dict(encoded_batch)),
+        )
+    else:
+        return model(**encoded_batch, output_hidden_states=True)
 
 @dataclasses.dataclass
 class ControlVector:
@@ -45,6 +67,8 @@ class ControlVector:
                     Defaults to 32. Try reducing this if you're running out of memory.
                 method (str, optional): The training method to use. Can be either
                     "pca_diff" or "pca_center". Defaults to "pca_diff".
+                norm_type (str, optional): The type of normalization to use when projecting
+                    onto the direction vector. Can be either "l1" or "l2". Defaults to "l2".
 
         Returns:
             ControlVector: The trained vector.
@@ -247,10 +271,12 @@ def read_representations(
     hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
     method: typing.Literal["pca_diff", "pca_center", "umap"] = "pca_diff",
+    use_cache: bool = True,
     transform_hiddens: (
         typing.Callable[[dict[int, np.ndarray]], dict[int, np.ndarray]] | None
     ) = None,
 ) -> dict[int, np.ndarray]:
+    norm_type: typing.Literal["l1", "l2"] = "l2",
     """
     Extract the representations based on the contrast dataset.
     """
@@ -262,10 +288,14 @@ def read_representations(
     hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
-    train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
+    train_strs = autocorrect_chat_templates(
+        messages=[s for ex in inputs for s in (ex.positive, ex.negative)],
+        tokenizer=tokenizer,
+        model=model,
+    )
 
     layer_hiddens = batched_get_hiddens(
-        model, tokenizer, train_strs, hidden_layers, batch_size
+        model, tokenizer, train_strs, hidden_layers, batch_size, use_cache=use_cache
     )
 
     if transform_hiddens is not None:
@@ -273,7 +303,7 @@ def read_representations(
 
     # get directions for each layer using PCA
     directions: dict[int, np.ndarray] = {}
-    for layer in tqdm.tqdm(hidden_layers):
+    for layer in tqdm.tqdm(hidden_layers, desc="Altering direction"):
         h = layer_hiddens[layer]
         assert h.shape[0] == len(inputs) * 2
 
@@ -303,7 +333,7 @@ def read_representations(
             directions[layer] = np.sum(train * embedding, axis=0) / np.sum(embedding)
 
         # calculate sign
-        projected_hiddens = project_onto_direction(h, directions[layer])
+        projected_hiddens = project_onto_direction(h, directions[layer], norm_type=norm_type)
 
         # order is [positive, negative, positive, negative, ...]
         positive_smaller_mean = np.mean(
@@ -331,6 +361,7 @@ def batched_get_hiddens(
     inputs: list[str],
     hidden_layers: list[int],
     batch_size: int,
+    use_cache: bool = True,
 ) -> dict[int, np.ndarray]:
     """
     Using the given model and tokenizer, pass the inputs through the model and get the hidden
@@ -343,11 +374,11 @@ def batched_get_hiddens(
     ]
     hidden_states = {layer: [] for layer in hidden_layers}
     with torch.no_grad():
-        for batch in tqdm.tqdm(batched_inputs):
+        for batch in tqdm.tqdm(batched_inputs, desc="Getting activations"):
             # get the last token, handling right padding if present
-            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
-            encoded_batch = encoded_batch.to(model.device)
-            out = model(**encoded_batch, output_hidden_states=True)
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
+            out = _model_forward(model, encoded_batch, use_cache=use_cache)
+
             attention_mask = encoded_batch["attention_mask"]
             for i in range(len(batch)):
                 last_non_padding_index = (
@@ -357,18 +388,30 @@ def batched_get_hiddens(
                     hidden_idx = layer + 1 if layer >= 0 else layer
                     hidden_state = (
                         out.hidden_states[hidden_idx][i][last_non_padding_index]
-                        .cpu()
-                        .float()
-                        .numpy()
+                        # .cpu()
+                        # .float()
+                        # .numpy()
                     )
-                    hidden_states[layer].append(hidden_state)
+                    if LOW_MEMORY:
+                        if len(hidden_states[layer]):
+                            hidden_states[layer] = np.vstack((hidden_states[layer], hidden_state.cpu().float().numpy()))
+                        else:
+                            hidden_states[layer].append(hidden_state.cpu().float().numpy())
+                    else:
+                        hidden_states[layer].append(hidden_state)
             del out
 
-    return {k: np.vstack(v) for k, v in hidden_states.items()}
+    if LOW_MEMORY:
+        return hidden_states
+    else:
+        return {k: torch.vstack(v).cpu().float().numpy() for k, v in hidden_states.items()}
 
 
-def project_onto_direction(H, direction):
+def project_onto_direction(H, direction, norm_type: str = "l2"):
     """Project matrix H (n, d_1) onto direction vector (d_2,)"""
-    mag = np.linalg.norm(direction)
+    if norm_type == "l2":
+        mag = np.linalg.norm(direction)  # l2 is the default
+    else:
+        mag = np.linalg.norm(direction, norm_type)
     assert not np.isinf(mag)
     return (H @ direction) / mag

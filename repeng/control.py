@@ -16,20 +16,51 @@ class ControlModel(torch.nn.Module):
     A wrapped language model that can have controls set on its layers with `self.set_control`.
     """
 
-    def __init__(self, model: PreTrainedModel, layer_ids: typing.Iterable[int]):
+    def __init__(
+            self,
+            model: PreTrainedModel,
+            layer_ids: typing.Union[typing.Iterable[int], typing.Literal['all', 'middle', 'only_middle'], str] = "all",
+    ):
         """
         **This mutates the wrapped `model`! Be careful using `model` after passing it to this class.**
 
         Build a new ControlModel around a model instance, initializing control on
         the layers specified in `layer_ids`.
-        """
 
+        `layer_ids` can now also be a string in the format "start-end" where start and end
+        are floats between 0 and 1, indicating the percentage range of layers to select.
+        """
         super().__init__()
         self.model = model
+        num_layers = model.config.num_hidden_layers
+
+        if not layer_ids or layer_ids == "all":
+            layer_ids = range(-1, -num_layers, -1)
+        elif layer_ids == "middle":  # keep only the middle half
+            layer_ids = [li for li in range(-1, -num_layers, -1)]
+            layer_ids = layer_ids[len(layer_ids)//4:-len(layer_ids)//4]
+        elif layer_ids == "only_middle":  # keep only the middle layer
+            layer_ids = [li for li in range(-1, -num_layers, -1)]
+            layer_ids = [layer_ids[len(layer_ids)//2]]
+        elif isinstance(layer_ids, str) and '-' in layer_ids:
+            start, end = map(float, layer_ids.split('-'))
+            if not (0 <= start < end <= 1):
+                raise ValueError("Invalid percentage range. Must be 0 <= start < end <= 1")
+            start_idx = max(0, min(num_layers - 1, int(start * num_layers)))
+            end_idx = max(0, min(num_layers - 1, int(end * num_layers)))
+            if start_idx == end_idx:
+                layer_ids = [start_idx]
+            else:
+                layer_ids = list(range(start_idx, end_idx + 1))
+            if not layer_ids:
+                raise ValueError("The specified range doesn't include any layers")
+        else:
+            assert isinstance(layer_ids, list) and all(isinstance(item, int) for item in layer_ids), "unexpected value for layer_ids"
 
         layers = model_layer_list(model)
         self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
-        for layer_id in layer_ids:
+
+        for layer_id in self.layer_ids:
             layer = layers[layer_id]
             if not isinstance(layer, ControlModule):
                 layers[layer_id] = ControlModule(layer)

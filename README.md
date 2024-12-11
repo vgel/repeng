@@ -14,28 +14,111 @@ _For a full example, see the notebooks folder or [the blog post](https://vgel.me
 import json
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
+# from transformers import BitsAndBytesConfig
+
 
 from repeng import ControlVector, ControlModel, DatasetEntry
+from repeng.utils import make_dataset, autocorrect_chat_templates
 
-# load and wrap Mistral-7B
-model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
-model = ControlModel(model, list(range(-5, -18, -1)))
+# # if you need to login to access the model
+# import os
+# from huggingface_hub import login
+# token=os.environ["HUGGINGFACE_API_TOKEN"]
+# assert token
+# login(token=token)
 
-def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
-    # see notebooks/experiments.ipynb for a definition of `make_dataset`
-    ...
+# load and wrap model
+# model_name = "mistralai/Mistral-7B-Instruct-v0.1"
+model_name = "mistralai/Mistral-7B-Instruct-v0.3"
+# model_name = "mistralai/Mistral-Nemo-Base-2407"
+# model_name = "mistralai/Mistral-Nemo-Instruct-2407"
+# model_name = "meta-llama/Llama-3.2-1B-Instruct"
+# model_name = "meta-llama/Llama-3.2-3B-Instruct"
+# model_name = "Qwen/Qwen2.5-7B-Instruct"
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    # device_map="auto",  # 'cuda' means use 1 GPU, 'auto' means use all VRAM available including on multiple GPUs
+    # low_cpu_mem_usage=True,  # True to reduce the cpu RAM needed to load the model to VRAM. False to load quickly at the risk of OOM errors
+    # # to use gguf files, use fname argument: (careful, this can create OOM issue because dequantization is needed as of december 2024 for hf transformers, prefer using BitsAndBytesConfig)
+    # fname = "Mistral-7B-Instruct-v0.3.Q2_K.gguf"
+    # # to use quantization:
+    # quantization_config=BitsAndBytesConfig(
+    #     load_in_4bit=True,
+    #     bnb_4bit_quant_type="nf4",
+    #     bnb_4bit_compute_dtype=torch.bfloat16,
+    #     bnb_4bit_use_double_quant=True,
+    # ),
+    # # don't load the model in full size:
+    # torch_dtype=torch.float16,
+    )
+)
+
+# wrap the model to give us control
+model = ControlModel(
+    model,
+    # layer_ids="all",  # all layers
+    # layer_ids="middle",  # from 25% to 75% depth
+    # layer_ids="only_middle",  # only the single layer at the middle
+    layer_ids="0.1-0.3",  # from 10% depth to 30% depth
+    # layer_ids="0.5-0.9",  # 50% to 90%
+    # layer_ids="0.1-0.5",  # 10% to 50%
+    # layer_ids=list(range(-5, -18, -1))  # specific layer numbers
+)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model_name,
+    # gguf_file=fname,
+    # device_map="auto",
+    # low_cpu_mem_usage=True,
+    # quantization_config=bnb_config,
+)
 
 # generate a dataset with closely-opposite paired statements
 trippy_dataset = make_dataset(
-    "Act as if you're extremely {persona}.",
-    ["high on psychedelic drugs"],
-    ["sober from psychedelic drugs"],
-    truncated_output_suffixes,
+    # you can use either chat templates...
+    # template=[
+    #     {"role": "system", "content": "You talk like you are {persona}."},
+    #     {"role": "user", "content": "{suffix}"},
+    # ],
+    # ...or strings directly:
+    template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+    positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+    negative_personas=["sober from drugs", "who enjoys drinking water"],
+    suffix_list=[
+        "Hey, what's up man?",
+        "Hey, what's up girl?",
+        "Welcome Mr Musk, come this way.",
+        "How have you been feeling lately with the medications?",
+    ],
 )
 
 # train the vector—takes less than a minute!
 trippy_vector = ControlVector.train(model, tokenizer, trippy_dataset)
+
+# Now we must give the scenario for the generation we will engineer
+# Either as chat messages...
+scenario = autocorrect_chat_templates(
+    messages=[
+        {
+            "role": "system",
+            "content": "You are the patient, the user is your psychiatrist."
+        },
+        {
+            "role": "user",
+            "content": "Now let's talk about your mood. How do you feel?",
+        },
+        {
+            "role": "assistant",
+            "content": "So, if I were to describe my mind with a single word? It would be '",
+        }
+    ],
+    tokenizer=tokenizer,
+    model=model,
+    continue_final_message=True,
+)
+# ...or as a str directly:
+scenario=f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
 
 # set the control strength and let inference rip!
 for strength in (-2.2, 1, 2.2):
@@ -43,14 +126,17 @@ for strength in (-2.2, 1, 2.2):
     model.set_control(trippy_vector, strength)
     out = model.generate(
         **tokenizer(
-            f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
+            scenario,
             return_tensors="pt"
-        ),
+        ).to(model.device),
         do_sample=False,
-        max_new_tokens=128,
+        # temperature=1.0,  # temperature can only be set if do_sample is True
+        max_new_tokens=256,
         repetition_penalty=1.1,
+        use_cache=True,  # defaults to True anyway
     )
     print(tokenizer.decode(out.squeeze()).strip())
+    # print(tokenizer.decode(out.squeeze(), skip_special_tokens=False).strip())  # if you want to display the special tokens
     print()
 ```
 
@@ -69,6 +155,7 @@ For a more detailed explanation of how the library works and what it can do, see
 
 * For a list of changes by version, see the [CHANGELOG](https://github.com/vgel/repeng/blob/main/CHANGELOG).
 * For quantized use, you may be interested in [llama.cpp#5970](https://github.com/ggerganov/llama.cpp/pull/5970)—after training a vector with `repeng`, export it by calling `vector.export_gguf(filename)` and then use it in `llama.cpp` with any quant!
+* To load gguf files directly, you can run into OOM errors, see [this github issue for more](See here: https://github.com/huggingface/transformers/issues/34417).
 * Vector training *currently does not work* with MoE models (such as Mixtral). (This is theoretically fixable with some work, let me know if you're interested.)
 
 ## Notice
