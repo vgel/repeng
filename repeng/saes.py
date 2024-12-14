@@ -100,3 +100,79 @@ def from_eleuther(
         )
 
     return Sae(layers=layer_dict)
+
+
+def from_saelens(
+    release: str,
+    layers_to_sae: dict[int, str],
+    *,
+    device: str = "cpu",
+    dtype: torch.dtype | None = None,
+):
+    """
+    NOTE: this method is WIP, interface may change.
+
+    `layers_to_sae` should be a dict from layer number (repeng layer, see below) to the appropriate sae-lens id (hard to understand
+    from the HF file structure, but the SAE readme should have a hint.)
+
+    e.g., for gemmascope on gemma 2b:
+    `{ layer: f"layer_{layer-1}/width_65k/canonical" for layer in range(1, 27) }`
+
+    Note that `layers_to_sae` should be 1-indexed, repeng style, not 0-indexed, sae-lens style. This may change in the future.
+    (Context: repeng counts embed_tokens as layer 0, then the first transformer block as layer 1, etc. sae-lens
+    counts embedding separately, then the first transformer block as layer 0.)
+    """
+
+    try:
+        import sae_lens  # type: ignore
+    except ImportError as e:
+        raise ImportError(
+            "`sae-lens` (or a transitive dependency) not installed"
+        ) from e
+
+    @dataclasses.dataclass
+    class SaeLensLayer:
+        # see docstr
+        # hang on to both for debugging
+        repeng_layer: int
+        sae_lens_id: str
+        cfg_dict: dict[str, typing.Any]
+        sae: sae_lens.SAE
+
+        def encode(self, activation: np.ndarray) -> np.ndarray:
+            # TODO: sparsify like `sae`?
+            at = torch.from_numpy(activation).to(self.sae.device)
+            out = self.sae.encode(at)
+            # numpy doesn't like bfloat16
+            return out.cpu().float().numpy()
+
+        def decode(self, features: np.ndarray) -> np.ndarray:
+            # TODO: sparsify like `sae`?
+            ft = torch.from_numpy(features).to(self.sae.device, dtype=self.sae.dtype)
+            decoded = self.sae.decode(ft)
+            return decoded.cpu().float().numpy()
+
+    layer_dict: dict[int, SaeLayer] = {}
+    for layer, sae_id in tqdm.tqdm(layers_to_sae.items()):
+        if dtype is None:
+            sae, cfg_dict, _ = sae_lens.SAE.from_pretrained(
+                release=release,
+                sae_id=sae_id,
+                device=device,
+            )
+        else:
+            # don't load directly on device because we can't pass a dtype to from_pretrained
+            # and we might not have enough vram to load the incorrect dtype
+            sae, cfg_dict, _ = sae_lens.SAE.from_pretrained(
+                release=release,
+                sae_id=sae_id,
+            )
+            sae = sae.to(device, dtype)
+        layer_dict[layer] = SaeLensLayer(
+            repeng_layer=layer,
+            sae_lens_id=sae_id,
+            cfg_dict=cfg_dict,
+            sae=sae,
+        )
+
+    return Sae(layers=layer_dict)
