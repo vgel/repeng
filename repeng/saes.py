@@ -20,11 +20,12 @@ class Sae:
 
 
 def from_eleuther(
+    repo_id: str,
+    *,
+    revision: str | None = None,
     device: str = "cpu",  # saes wants str | torch.device, safetensors wants str | int... so str it is
     dtype: torch.dtype | None = torch.bfloat16,
     layers: typing.Iterable[int] = range(1, 32),
-    repo: str = "EleutherAI/sae-llama-3-8b-32x",
-    revision: str = "32926540825db694b6228df703f4528df4793d67",
 ) -> Sae:
     """
     Note that `layers` should be 1-indexed, repeng style, not 0-indexed, Eleuther style. This may change in the future.
@@ -34,7 +35,8 @@ def from_eleuther(
     """
 
     try:
-        import safetensors.torch, huggingface_hub
+        import huggingface_hub
+        import safetensors.torch
         import sae as eleuther_sae  # type: ignore
     except ImportError as e:
         raise ImportError(
@@ -65,7 +67,9 @@ def from_eleuther(
             return decoded.cpu().float().numpy()
 
     # TODO: only download requested layers?
-    base_path = pathlib.Path(huggingface_hub.snapshot_download(repo, revision=revision))
+    base_path = pathlib.Path(
+        huggingface_hub.snapshot_download(repo_id, revision=revision)
+    )
     layer_dict: dict[int, SaeLayer] = {}
     for layer in tqdm.tqdm(layers):
         eleuther_layer = layer - 1  # see docstr
