@@ -1,6 +1,6 @@
 [project]
 name = "repeng"
-version = "0.3.1"
+version = "0.4.0"
 description = "representation engineering / control vectors"
 authors = [{ name = "Theia Vogel", email = "theia@vgel.me" }]
 readme = "README.md"
