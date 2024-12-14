@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - 2024-12-13
+
+* SAE support! See `notebooks/sae.ipynb` for an example. (#49)
+* Fixes for models in `bfloat16`. (#49)
+* `accelerate` removed from project dependencies, please install it manually with `pip install accelerate` if you need `device_map="auto"` or other `accelerate` features. (#56)
+* (for devs) Migrate project to `uv` and `ruff` from `poetry` and `black`. (#56)
 
 ## 0.3.1 - 2024-07-01
 
