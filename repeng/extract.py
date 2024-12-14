@@ -166,7 +166,7 @@ class ControlVector:
                 continue
             try:
                 layer = int(tensor.name.split(".")[1])
-            except:
+            except (IndexError, ValueError):
                 raise ValueError(
                     f".gguf file has invalid direction field name: {tensor.name}"
                 )

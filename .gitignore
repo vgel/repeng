@@ -1,7 +1,8 @@
 # project
+__pycache__/
+.venv/
 
 # system
-__pycache__/
 *.pyc
 *.pyo
 *.pyd

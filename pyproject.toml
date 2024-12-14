@@ -1,27 +1,29 @@
-[tool.poetry]
+[project]
 name = "repeng"
 version = "0.3.1"
 description = "representation engineering / control vectors"
-authors = ["Theia Vogel <theia@vgel.me>"]
+authors = [{ name = "Theia Vogel", email = "theia@vgel.me" }]
 readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy <2.0.0",
+    "scikit-learn>=1.4.0",
+    "torch>=2.1.2",
+    "transformers>=4.36.2",
+    "tqdm>=4.66.1",
+    "gguf>=0.6.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.10,<3.12" # `accelerate` doesn't support 3.12 yet
-numpy = "^1.26.3"
-scikit-learn = "^1.4.0"
-torch = "^2.1.2"
-transformers = "^4.36.2"
-accelerate = "^0.26.1"
-tqdm = "^4.66.1"
-gguf = "^0.6.0"
-
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.2"
-black = "^24.2.0" # make sure to keep this in sync with .github/workflows/ci.yml
+[dependency-groups]
+dev = [
+    "pytest>=8.0.2",
+    "black>=24.2.0", # make sure to keep this in sync with .github/workflows/ci.yml
+    "ruff>=0.8.3",
+]
 
 [tool.pytest.ini_options]
 python_files = ["tests.py"]
 
 [build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
