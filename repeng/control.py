@@ -177,6 +177,7 @@ class ControlModule(torch.nn.Module):
             mask = (
                 (col_indices >= zero_indices)
                 .float()
+                .repeat(target_shape[0], 1)
                 .reshape(target_shape[0], target_shape[1], 1)
             )
             mask = mask.to(modified.dtype).to(modified.device)
