@@ -170,14 +170,19 @@ class ControlModule(torch.nn.Module):
         # mask has ones for non padding tokens and zeros at padding tokens.
         # only tested this on left padding
         if "position_ids" in kwargs:
+            target_shape = modified.shape
             pos = kwargs["position_ids"]
+            if pos.shape[0] != target_shape[0]:
+                pos = pos.repeat(target_shape[0], 1)
             zero_indices = (pos == 0).cumsum(1).argmax(1, keepdim=True)
             col_indices = torch.arange(pos.size(1), device=pos.device).unsqueeze(0)
-            target_shape = modified.shape
+            if pos.shape[0] != pos.shape[0]:
+                col_indices = col_indices.repeat(pos.shape[0], 1)
+
+            # sometimes position_ids has a batch of 1, and sometimes batch?
             mask = (
                 (col_indices >= zero_indices)
                 .float()
-                .repeat(target_shape[0], 1)
                 .reshape(target_shape[0], target_shape[1], 1)
             )
             mask = mask.to(modified.dtype).to(modified.device)
