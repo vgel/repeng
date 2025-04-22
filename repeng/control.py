@@ -206,11 +206,10 @@ class ControlModule(torch.nn.Module):
 def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleList:
     if isinstance(model, ControlModel):
         model = model.model
-
-    candidates = [v for k,v in model.named_modules() if k.endswith('.model.layers')]
     elif hasattr(model, "transformer"):  # gpt-2-like
         return model.transformer.h
-    elif len(candidates)==1: # gemma or mistral-like
+    candidates = [v for k,v in model.named_modules() if k.endswith('.model.layers')]
+    if len(candidates)==1: # gemma or mistral-like
         return candidates[0]
     else:
         raise ValueError(f"don't know how to get layer list for {type(model)}")
