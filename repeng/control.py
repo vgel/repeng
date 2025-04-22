@@ -208,7 +208,7 @@ def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleLi
         model = model.model
     elif hasattr(model, "transformer"):  # gpt-2-like
         return model.transformer.h
-    candidates = [v for k,v in model.named_modules() if k.endswith('.model.layers')]
+    candidates = [v for k,v in model.named_modules() if k.endswith('model.layers')]
     if len(candidates)==1: # gemma or mistral-like
         return candidates[0]
     else:
