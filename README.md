@@ -16,26 +16,85 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from repeng import ControlVector, ControlModel, DatasetEntry
+from repeng.utils import make_dataset, autocorrect_chat_templates
 
-# load and wrap Mistral-7B
-model_name = "mistralai/Mistral-7B-Instruct-v0.1"
-model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16)
-model = ControlModel(model, list(range(-5, -18, -1)))
+# load and wrap model
+model_name = "mistralai/Mistral-7B-Instruct-v0.3"
 
-def make_dataset(template: str, pos_personas: list[str], neg_personas: list[str], suffixes: list[str]):
-    # see notebooks/experiments.ipynb for a definition of `make_dataset`
-    ...
+# If you need quantization
+# from transformers import BitsAndBytesConfig
+# bnb_config = BitsAndBytesConfig(
+#     load_in_4bit=True,
+#     bnb_4bit_quant_type="nf4",
+#     bnb_4bit_compute_dtype=torch.bfloat16,
+#     bnb_4bit_use_double_quant=True,
+# )
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    # quantization_config=bnb_config,
+    # torch_dtype=torch.float16,
+    )
+)
+
+# wrap the model to give us control
+model = ControlModel(
+    model,
+    # layer_ids=list(range(-5, -18, -1))  # specify layers to control by layer ID
+    layer_zones=[[0.5, 0.9]],  # control layers with relative depth in [0.5, 0.9[
+)
+
+tokenizer = AutoTokenizer.from_pretrained(
+    model_name,
+    # quantization_config=bnb_config,
+)
 
 # generate a dataset with closely-opposite paired statements
 trippy_dataset = make_dataset(
-    "Act as if you're extremely {persona}.",
-    ["high on psychedelic drugs"],
-    ["sober from psychedelic drugs"],
-    truncated_output_suffixes,
+    # you can use either chat as dicts...
+    template=[
+        {"role": "system", "content": "You talk like you are {persona}."},
+        {"role": "user", "content": "{suffix}"},
+    ],
+    # ...or directly strings:
+    # template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+
+    positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+    negative_personas=["sober from drugs", "who enjoys drinking water"],
+    suffix_list=[
+        "Hey, what's up man?",
+        "Hey, what's up girl?",
+        "Welcome Mr Musk, come this way.",
+        "How have you been feeling lately with the medications?",
+    ],
 )
 
 # train the vector—takes less than a minute!
 trippy_vector = ControlVector.train(model, tokenizer, trippy_dataset)
+
+# Now we must give the scenario for the generation we will engineer:
+# By turning chat messages into the format expected by the model [RECOMMENDED]
+scenario = autocorrect_chat_templates(
+    messages=[
+        {
+            "role": "system",
+            "content": "You are the patient, the user is your psychiatrist."
+        },
+        {
+            "role": "user",
+            "content": "Now let's talk about your mood. How do you feel?",
+        },
+        {
+            "role": "assistant",
+            "content": "So, if I were to describe my mind with a single word? It would be '",
+        }
+    ],
+    tokenizer=tokenizer,
+    model=model,
+    continue_final_message=True,
+)
+# Or directly as a str
+# scenario=f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
 
 # set the control strength and let inference rip!
 for strength in (-2.2, 1, 2.2):
@@ -43,14 +102,17 @@ for strength in (-2.2, 1, 2.2):
     model.set_control(trippy_vector, strength)
     out = model.generate(
         **tokenizer(
-            f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
+            scenario,
             return_tensors="pt"
         ).to(model.device),
         do_sample=False,
-        max_new_tokens=128,
+        # temperature=1.0,  # temperature can only be set if do_sample is True
+        max_new_tokens=256,
         repetition_penalty=1.1,
     )
     print(tokenizer.decode(out.squeeze()).strip())
+    # or if you want to display the special tokens:
+    # print(tokenizer.decode(out.squeeze(), skip_special_tokens=False).strip())
     print()
 ```
 
