@@ -16,20 +16,46 @@ class ControlModel(torch.nn.Module):
     A wrapped language model that can have controls set on its layers with `self.set_control`.
     """
 
-    def __init__(self, model: PreTrainedModel, layer_ids: typing.Iterable[int]):
+    def __init__(
+        self,
+        model: PreTrainedModel,
+        layer_ids: typing.Optional[typing.Iterable[int]]=None,
+        layer_zones: typing.Optional[typing.Iterable[float]]=None,
+    ):
         """
         **This mutates the wrapped `model`! Be careful using `model` after passing it to this class.**
 
         Build a new ControlModel around a model instance, initializing control on
-        the layers specified in `layer_ids`.
+        the layers specified in `layer_ids` or `layer_zones`.
+
+        To control layers #3 and 5, use layer_ids=[3,5].
+        To control layers by their relative depth, use layer_zones=[[0.1, 0.5]] to
+            control the layers with depth between 10% and 50% (left inclusive). you
+            can specify multiple zones but no overlapping nor empty zones are allowed.
         """
+
+        assert (layer_ids or layer_zones) and not (layer_ids and layer_zones), "Must supply either layer_ids or layer_zones argument"
 
         super().__init__()
         self.model = model
 
         layers = model_layer_list(model)
+
         self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
-        for layer_id in layer_ids:
+        nlayers = len(self.layer_ids)
+        if layer_zones:
+            layers_to_control = []
+            for start_zone, end_zone in layer_zones:
+                assert start_zone < end_zone and start_zone >= 0 and start_zone <= 1 and end_zone >= 0 and end_zone <= 1, "wrong layer_zones format"
+                new_layers = [lid for ilid, lid in enumerate(self.layer_ids) if start_zone <= (ilid/nlayers) < end_zone]
+                assert new_layers, f"No layers found in zone {start_zone} to {end_zone}"
+                assert not any(nl in layers_to_control for nl in new_layers), "Overlapping zones found"
+                layers_to_control.append(new_layers)
+        else:
+            layers_to_control = layer_ids
+        assert layers_to_control, "No layers to control"
+
+        for layer_id in layers_to_control:
             layer = layers[layer_id]
             if not isinstance(layer, ControlModule):
                 layers[layer_id] = ControlModule(layer)
