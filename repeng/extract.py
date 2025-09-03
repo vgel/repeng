@@ -162,7 +162,7 @@ class ControlVector:
                 continue
             try:
                 layer = int(tensor.name.split(".")[1])
-            except:
+            except (IndexError, ValueError):
                 raise ValueError(
                     f".gguf file has invalid direction field name: {tensor.name}"
                 )
@@ -223,16 +223,16 @@ class ControlVector:
             directions[layer] = -self.directions[layer]
         return ControlVector(model_type=self.model_type, directions=directions)
 
-    def __mul__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+    def __mul__(self, other: int | float | np.number) -> "ControlVector":
         directions: dict[int, np.ndarray] = {}
         for layer in self.directions:
             directions[layer] = other * self.directions[layer]
         return ControlVector(model_type=self.model_type, directions=directions)
 
-    def __rmul__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+    def __rmul__(self, other: int | float | np.number) -> "ControlVector":
         return self.__mul__(other)
 
-    def __truediv__(self, other: int | float | np.int_ | np.float_) -> "ControlVector":
+    def __truediv__(self, other: int | float | np.number) -> "ControlVector":
         return self.__mul__(1 / other)
 
 

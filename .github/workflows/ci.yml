@@ -10,26 +10,44 @@ jobs:
   format:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: run black
-      # make sure to keep this in sync with pyproject.toml
-      run: pipx run -- "black>=24.2.0,<25.0.0" --check .
+    - uses: actions/checkout@v4
+
+    - name: install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "0.5.9"
+
+    - name: ruff check
+      run: uv run ruff check
+
+    - name: ruff format --check
+      run: uv run ruff format --check
 
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
-    - uses: actions/checkout@v2
-    - run: pipx install poetry
-    - name: install python ${{ matrix.python-version }}
+    - uses: actions/checkout@v4
+
+    # don't use uv install python because we need a system python for
+    # numpy wheel builds
+    - name: install python
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        cache: 'poetry'
-    - run: poetry install
+
+    - name: install uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        version: "0.5.9"
+        enable-cache: true
+        cache-dependency-glob: "uv.lock"
+
+    - run: uv sync --all-extras --dev
+
     - name: cache huggingface
       uses: actions/cache@v4
       with:
@@ -37,4 +55,5 @@ jobs:
         key: ${{ runner.os }}-hf-models-${{ hashFiles('**/lockfiles') }}
         restore-keys: |
           ${{ runner.os }}-hf-models-
-    - run: poetry run pytest
+
+    - run: uv run pytest
