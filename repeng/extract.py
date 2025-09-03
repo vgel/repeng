@@ -345,8 +345,7 @@ def batched_get_hiddens(
     with torch.no_grad():
         for batch in tqdm.tqdm(batched_inputs):
             # get the last token, handling right padding if present
-            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
-            encoded_batch = encoded_batch.to(model.device)
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
             out = model(**encoded_batch, output_hidden_states=True)
             attention_mask = encoded_batch["attention_mask"]
             for i in range(len(batch)):
