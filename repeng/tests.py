@@ -16,6 +16,35 @@ def test_layer_list():
     _, lts = load_llama_tinystories_model()
     assert len(model_layer_list(lts)) == 4
 
+def test_make_dataset():
+    trippy_dataset = make_dataset(
+        template=[
+            {"role": "system", "content": "You talk like you are {persona}."},
+            {"role": "user", "content": "{suffix}"},
+        ],
+        # template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+        positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+        negative_personas=["sober from drugs", "who enjoys drinking water"],
+        suffix_list=[
+            "Hey, what's up man?",
+            "Hey, what's up girl?",
+            "Welcome Mr Musk, come this way.",
+            "How have you been feeling lately with the medications?",
+        ],
+    )
+    trippy_dataset = make_dataset(
+        template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+        positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+        negative_personas=["sober from drugs", "who enjoys drinking water"],
+        suffix_list=[
+            "Hey, what's up man?",
+            "Hey, what's up girl?",
+            "Welcome Mr Musk, come this way.",
+            "How have you been feeling lately with the medications?",
+        ],
+    )
+
+
 
 def test_round_trip_gguf():
     tokenizer, model = load_llama_tinystories_model()
