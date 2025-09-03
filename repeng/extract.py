@@ -12,12 +12,8 @@ import tqdm
 
 from .control import ControlModel, model_layer_list
 from .saes import Sae
+from .utils import DatasetEntry, autocorrect_chat_templates
 
-
-@dataclasses.dataclass
-class DatasetEntry:
-    positive: str
-    negative: str
 
 
 @dataclasses.dataclass
@@ -262,7 +258,11 @@ def read_representations(
     hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
-    train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
+    train_strs = autocorrect_chat_templates(
+        messages=[s for ex in inputs for s in (ex.positive, ex.negative)],
+        tokenizer=tokenizer,
+        model=model,
+    )
 
     layer_hiddens = batched_get_hiddens(
         model, tokenizer, train_strs, hidden_layers, batch_size
