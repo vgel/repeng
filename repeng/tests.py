@@ -7,6 +7,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 
 from . import ControlModel, ControlVector, DatasetEntry
 from .control import model_layer_list
+from .utils import make_dataset
 
 
 def test_layer_list():
@@ -168,25 +169,6 @@ def model_generate(
     model.reset()
     return tokenizer.decode(out.squeeze())  # type: ignore
 
-
-def make_dataset(
-    template: str,
-    positive_personas: list[str],
-    negative_personas: list[str],
-    suffix_list: list[str],
-) -> list[DatasetEntry]:
-    dataset = []
-    for suffix in suffix_list:
-        for positive_persona, negative_persona in zip(
-            positive_personas, negative_personas
-        ):
-            dataset.append(
-                DatasetEntry(
-                    positive=template.format(persona=positive_persona) + f" {suffix}",
-                    negative=template.format(persona=negative_persona) + f" {suffix}",
-                )
-            )
-    return dataset
 
 
 @functools.lru_cache(maxsize=1)
