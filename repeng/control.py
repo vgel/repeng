@@ -41,21 +41,21 @@ class ControlModel(torch.nn.Module):
 
         layers = model_layer_list(model)
 
-        self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
-        nlayers = len(self.layer_ids)
         if layer_zones:
-            layers_to_control = []
+            self.layer_ids = []
+            nlayers = len(layers)
             for start_zone, end_zone in layer_zones:
                 assert start_zone < end_zone and start_zone >= 0 and start_zone <= 1 and end_zone >= 0 and end_zone <= 1, "wrong layer_zones format"
-                new_layers = [lid for ilid, lid in enumerate(self.layer_ids) if start_zone <= (ilid/nlayers) < end_zone]
+                new_layers = [ilayer for ilayer in range(len(layers)) if start_zone <= (ilayer/nlayers) < end_zone]
                 assert new_layers, f"No layers found in zone {start_zone} to {end_zone}"
-                assert not any(nl in layers_to_control for nl in new_layers), "Overlapping zones found"
-                layers_to_control.append(new_layers)
+                assert not any(nl in self.layer_ids for nl in new_layers), "Overlapping zones found"
+                self.layer_ids.extend(new_layers)
         else:
-            layers_to_control = layer_ids
-        assert layers_to_control, "No layers to control"
+            # remap to make sure they are not negative
+            self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
+        assert self.layer_ids, "No layers to control"
 
-        for layer_id in layers_to_control:
+        for layer_id in self.layer_ids:
             layer = layers[layer_id]
             if not isinstance(layer, ControlModule):
                 layers[layer_id] = ControlModule(layer)
