@@ -139,6 +139,8 @@ class ControlModule(torch.nn.Module):
         super().__init__()
         self.block: torch.nn.Module = block
         self.params: BlockControlParams = BlockControlParams.default()
+        if hasattr(block, 'attention_type'):
+            self.attention_type = block.attention_type
 
     def set_control(self, params: BlockControlParams) -> None:
         self.params = params
@@ -202,8 +204,12 @@ def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleLi
         model = model.model
 
     if hasattr(model, "model"):  # mistral-like
-        return model.model.layers
+        layers = model.model.layers
+    elif hasattr(model, "layers"):  # qwen3-like
+        layers = model.layers
     elif hasattr(model, "transformer"):  # gpt-2-like
-        return model.transformer.h
+        layers = model.transformer.h
     else:
         raise ValueError(f"don't know how to get layer list for {type(model)}")
+
+    return layers
