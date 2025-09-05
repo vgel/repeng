@@ -71,7 +71,7 @@ def from_eleuther(
         huggingface_hub.snapshot_download(repo_id, revision=revision)
     )
     layer_dict: dict[int, SaeLayer] = {}
-    for layer in tqdm.tqdm(layers):
+    for layer in tqdm.tqdm(layers, desc="Creating SAE"):
         eleuther_layer = layer - 1  # see docstr
         # this is in `sae` but to load the dtype we want, need to reimpl some stuff
         layer_path = base_path / f"layers.{eleuther_layer}"

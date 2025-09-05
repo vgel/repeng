@@ -343,7 +343,7 @@ def batched_get_hiddens(
     ]
     hidden_states = {layer: [] for layer in hidden_layers}
     with torch.no_grad():
-        for batch in tqdm.tqdm(batched_inputs):
+        for batch in tqdm.tqdm(batched_inputs, desc="Computing activations"):
             # get the last token, handling right padding if present
             encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
             out = model(**encoded_batch, output_hidden_states=True)
