@@ -16,7 +16,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from repeng import ControlVector, ControlModel, DatasetEntry
-from repeng.utils import make_dataset, autocorrect_chat_templates
+from repeng.utils import make_dataset
 
 # load and wrap model
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -73,9 +73,8 @@ trippy_dataset = make_dataset(
 trippy_vector = ControlVector.train(model, tokenizer, trippy_dataset)
 
 # Now we must give the scenario for the generation we will engineer:
-# By turning chat messages into the format expected by the model [RECOMMENDED]
-scenario = autocorrect_chat_templates(
-    messages=[
+scenario: str = tokenizer.apply_chat_template(
+    conversation=[
         {
             "role": "system",
             "content": "You are the patient, the user is your psychiatrist."
@@ -89,10 +88,10 @@ scenario = autocorrect_chat_templates(
             "content": "So, if I were to describe my mind with a single word? It would be '",
         }
     ],
-    tokenizer=tokenizer,
-    model=model,
     continue_final_message=True,
+    tokenize=False,
 )
+
 # Or directly as a str
 # scenario=f"[INST] Give me a one-sentence pitch for a TV show. [/INST]",
 
