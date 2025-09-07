@@ -229,10 +229,10 @@ class ControlModule(torch.nn.Module):
                 .reshape(target_shape[0], target_shape[1], 1)
             )
             mask = mask.to(modified.dtype).to(modified.device)
+            modified = self.params.operator(modified, control * mask)
         else:
-            mask = 1.0
+            modified = self.params.operator(modified, control)
 
-        modified = self.params.operator(modified, control * mask)
 
         if self.params.normalize:
             norm_post = torch.norm(modified, dim=-1, keepdim=True)
