@@ -212,7 +212,8 @@ class ControlModule(torch.nn.Module):
         assert len(control.shape) == len(modified.shape)
         control = control.to(modified.device)
 
-        norm_pre = torch.norm(modified, dim=-1, keepdim=True)
+        if self.params.normalize:
+            norm_pre = torch.norm(modified, dim=-1, keepdim=True)
 
         # we should ignore the padding tokens when doing the activation addition
         # mask has ones for non padding tokens and zeros at padding tokens.
