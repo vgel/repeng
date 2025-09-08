@@ -5,6 +5,8 @@ from loguru import logger
 import torch
 from transformers import PretrainedConfig, PreTrainedModel
 
+from repeng.utils import get_num_hidden_layer
+
 if typing.TYPE_CHECKING:
     from .extract import ControlVector
 
@@ -39,8 +41,8 @@ class ControlModel(torch.nn.Module):
         super().__init__()
         self.model = model
 
-        # Get the number of layers and normalize the layer indexes if they're negative
-        layer_ids = list(range(model.config.num_hidden_layers))
+        # Get the number of layers
+        layer_ids = list(range(get_num_hidden_layer(model)))
         nlayers = len(layer_ids)
 
         if layer_zones:
@@ -250,13 +252,15 @@ def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleLi
     if isinstance(model, ControlModel):
         model = model.model
 
-    if hasattr(model, "model"):  # mistral-like
-        layers = model.model.layers
-    elif hasattr(model, "base_model"):  # mamba like
-        layers = model.base_model.layers
+    if hasattr(model, "language_model"):  # gemmma3 like
+        layers = model.language_model.layers
     elif hasattr(model, "layers"):  # qwen3-like
         layers = model.layers
+    elif hasattr(model, "base_model"):  # mamba like
+        layers = model.base_model.layers
     elif hasattr(model, "transformer"):  # gpt-2-like
-        return model.transformer.h
+        layers = model.transformer.h
+    elif hasattr(model, "model"):  # mistral-like
+        layers = model.model.layers
     else:
         raise ValueError(f"don't know how to get layer list for {type(model)}")

@@ -12,7 +12,7 @@ import tqdm
 
 from .control import ControlModel, model_layer_list
 from .saes import Sae
-from .utils import DatasetEntry, autocorrect_chat_templates
+from .utils import DatasetEntry, get_model_name, autocorrect_chat_templates, get_num_hidden_layer
 
 
 
@@ -251,7 +251,7 @@ def read_representations(
     Extract the representations based on the contrast dataset.
     """
     if not hidden_layers:
-        hidden_layers = list(range(model.config.num_hidden_layers))
+        hidden_layers = list(range(get_num_hidden_layer(model)))
 
     n_layers = len(model_layer_list(model))
 

@@ -120,6 +120,28 @@ def get_model_name(model) -> str:
     else:
         raise ValueError("Couldn't find model name")
 
+def get_num_hidden_layer(model) -> int:
+    """
+    Retrieve the number of hidden layer in a given model.
+
+    Args:
+        model: The model object to retrieve the num_hidden_layers from.
+
+    Returns:
+        int: The number of hidden layers
+
+    Raises:
+        ValueError: If the model num_hidden_layers cannot be determined.
+    """
+    if hasattr(model.config, "num_hidden_layers"):
+        num_hidden_layers = model.config.num_hidden_layers
+    elif hasattr(model.config, "text_config"):
+        # gemma3 models have a config for text and one for images
+        num_hidden_layers = model.config.text_config.num_hidden_layers
+    else:
+        raise ValueError("Can't find the number of hidden layers")
+    return num_hidden_layers
+
 
 def autocorrect_chat_templates(
     messages: typing.Union[list[list[dict]], list[dict], list[str], str],
