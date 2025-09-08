@@ -77,19 +77,11 @@ trippy_vector = ControlVector.train(model, tokenizer, trippy_dataset)
 scenario: str = tokenizer.apply_chat_template(
     conversation=[
         {
-            "role": "system",
-            "content": "You are the patient, the user is your psychiatrist."
-        },
-        {
             "role": "user",
-            "content": "Now let's talk about your mood. How do you feel?",
+            "content": "Give me a one-sentence pitch for a TV show."
         },
-        {
-            "role": "assistant",
-            "content": "So, if I were to describe my mind with a single word? It would be '",
-        }
     ],
-    continue_final_message=True,
+    continue_final_message=False,
     tokenize=False,
 )
 
