@@ -21,7 +21,8 @@ from repeng.utils import make_dataset
 # load and wrap model
 model_name = "mistralai/Mistral-7B-Instruct-v0.3"
 
-# If you need quantization
+# If you need quantization, but can lead to issues. For
+# example Gemma3 models seem to silently generate empty strings.
 # from transformers import BitsAndBytesConfig
 # bnb_config = BitsAndBytesConfig(
 #     load_in_4bit=True,
