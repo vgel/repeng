@@ -134,6 +134,13 @@ def autocorrect_chat_templates(
     input format for the specified model and tokenizer. It handles various input types
     and applies model-specific corrections when necessary.
 
+    It might be necessary anymore but was needed when huggingface hadn't yet
+    implemented proper templates. It is nonetheless used as fallback if
+    model.train crashes because of the template.
+
+    If the tokenizer has no chat template, we crudely turn the input chat
+    messages into a dialogue.
+
     Args:
         messages (Union[list[list[dict]], list[dict], list[str], str]): The input messages
             to be corrected. Can be a single message, a list of messages, or a list of chats.
@@ -154,8 +161,6 @@ def autocorrect_chat_templates(
 
     if isinstance(messages, str):  # not a chat template
         return messages
-    elif isinstance(messages, list) and all(isinstance(mess, str) for mess in messages):
-        return messages
     elif isinstance(messages, list) and all(
         isinstance(mess, list) for mess in messages
     ):  # list of chats instead of a list of messages
@@ -168,6 +173,14 @@ def autocorrect_chat_templates(
             set(templated)
         ), "the dataset should not contain duplicates"
         return templated
+
+    # if there is no chat template, make it ourselves
+    if not tokenizer.chat_template:
+        output = ""
+        for m in messages:
+            role, content = m["role"], m["content"]
+            output += f"- {role.title()}: {content.strip()}\n"
+        return output.strip()
 
     model_name = get_model_name(model).lower()
 
