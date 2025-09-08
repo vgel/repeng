@@ -251,11 +251,9 @@ def read_representations(
     Extract the representations based on the contrast dataset.
     """
     if not hidden_layers:
-        hidden_layers = range(-1, -model.config.num_hidden_layers, -1)
+        hidden_layers = list(range(model.config.num_hidden_layers))
 
-    # normalize the layer indexes if they're negative
     n_layers = len(model_layer_list(model))
-    hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
     train_strs = autocorrect_chat_templates(

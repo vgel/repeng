@@ -39,21 +39,43 @@ class ControlModel(torch.nn.Module):
         super().__init__()
         self.model = model
 
-        layers = model_layer_list(model)
+        # Get the number of layers and normalize the layer indexes if they're negative
+        layer_ids = list(range(model.config.num_hidden_layers))
+        nlayers = len(layer_ids)
 
         if layer_zones:
             self.layer_ids = []
-            nlayers = len(layers)
             for start_zone, end_zone in layer_zones:
-                assert start_zone < end_zone and start_zone >= 0 and start_zone <= 1 and end_zone >= 0 and end_zone <= 1, "wrong layer_zones format"
-                new_layers = [ilayer for ilayer in range(len(layers)) if start_zone <= (ilayer/nlayers) < end_zone]
+                assert (
+                    start_zone < end_zone
+                    and start_zone >= 0
+                    and start_zone <= 1
+                    and end_zone >= 0
+                    and end_zone <= 1
+                ), "wrong layer_zones format"
+                if end_zone != 1.0:
+                    new_layers = [
+                        ilayer
+                        for ilayer in layer_ids
+                        if start_zone <= (ilayer / nlayers) < end_zone
+                    ]
+                else:  # trick to make sure to include the last layers if desired
+                    new_layers = [
+                        ilayer
+                        for ilayer in layer_ids
+                        if start_zone <= (ilayer / nlayers)
+                    ]
                 assert new_layers, f"No layers found in zone {start_zone} to {end_zone}"
                 assert not any(nl in self.layer_ids for nl in new_layers), "Overlapping zones found"
                 self.layer_ids.extend(new_layers)
         else:
             # remap to make sure they are not negative
-            self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
+            self.layer_ids = layer_ids
+
         assert self.layer_ids, "No layers to control"
+
+        layers = model_layer_list(model)
+        assert len(layers) == len(layer_ids)
 
         for layer_id in self.layer_ids:
             layer = layers[layer_id]
