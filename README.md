@@ -42,7 +42,7 @@ model = AutoModelForCausalLM.from_pretrained(
 model = ControlModel(
     model,
     # layer_ids=list(range(-5, -18, -1))  # specify layers to control by layer ID
-    layer_zones=[[0.5, 0.9]],  # control layers with relative depth in [0.5, 0.9[
+    layer_zones=[[0.3, 0.5]],  # control layers with relative depth in [0.3, 0.5[
 )
 
 tokenizer = AutoTokenizer.from_pretrained(
