@@ -3,6 +3,7 @@ import copy
 import typing
 import dataclasses
 
+import warnings
 from loguru import logger
 
 
@@ -348,7 +349,7 @@ def autocorrect_chat_templates(
             # raise ValueError(
             #     "Besides mistral and llama model, no other chat template correction are implemented"
             # )
-            logger.warning("Failed to properly autocorrect the chat template, will use a sane default template")
+            warnings.warn("Failed to properly autocorrect the chat template, will use a sane default template")
             copied_mes[first_user_index][
                 "content"
             ] = f"{sys_message['content'].rstrip()}\n\n{copied_mes[first_user_index]['content'].lstrip()}"

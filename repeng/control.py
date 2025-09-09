@@ -1,6 +1,6 @@
 import dataclasses
 import typing
-from loguru import logger
+import warnings
 
 import torch
 from transformers import PretrainedConfig, PreTrainedModel
@@ -84,7 +84,7 @@ class ControlModel(torch.nn.Module):
             if not isinstance(layer, ControlModule):
                 layers[layer_id] = ControlModule(layer)
             else:
-                logger.warning(
+                warnings.warn(
                     "Trying to rewrap a wrapped model! Probably not what you want! Try calling .unwrap first."
                 )
 
