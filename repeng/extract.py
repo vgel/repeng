@@ -264,9 +264,11 @@ def read_representations(
     # the order is [positive, negative, positive, negative, ...]
     train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
 
-    layer_hiddens = batched_get_hiddens(
+    layer_hiddens, logps = batched_get_hiddens(
         model, tokenizer, train_strs, hidden_layers, batch_size
     )
+
+
 
     if transform_hiddens is not None:
         layer_hiddens = transform_hiddens(layer_hiddens)
@@ -279,16 +281,23 @@ def read_representations(
 
         if method == "pca_diff":
             train = h[::2] - h[1::2]
+            weights = (logps[::2] + logps[1::2]) / 2
+            # Normalize to [0, 2] range with mean ≈ 1
+            weights = (weights - weights.min()) / (weights.max() - weights.min()) * 2.0
         elif method == "pca_center":
             center = (h[::2] + h[1::2]) / 2
             train = h
             train[::2] -= center
             train[1::2] -= center
+            # Normalize to [0, 2] range with mean ≈ 1  
+            weights = (logps - logps.min()) / (logps.max() - logps.min()) * 2.0
         elif method == "umap":
             train = h
         else:
             raise ValueError("unknown method " + method)
 
+        # Importance Sampling, weight by completion likelihood to get online hidden states (rather than offline policy rollouts that are less relevant to the model)
+        train = train * weights  # Direct weighting to preserve relative importance
         if method != "umap":
             # shape (1, n_features)
             pca_model = PCA(n_components=1, whiten=False).fit(train)
@@ -342,6 +351,7 @@ def batched_get_hiddens(
         inputs[p : p + batch_size] for p in range(0, len(inputs), batch_size)
     ]
     hidden_states = {layer: [] for layer in hidden_layers}
+    completion_lprob = []
     with torch.no_grad():
         for batch in tqdm.tqdm(batched_inputs):
             # get the last token, handling right padding if present
@@ -362,9 +372,19 @@ def batched_get_hiddens(
                         .numpy()
                     )
                     hidden_states[layer].append(hidden_state)
+
+                lprobs = out.logits[i].log_softmax(-1)
+                label_mask = attention_mask[i, 1:]
+                labels = encoded_batch["input_ids"][i, 1:, None]
+                lprobs_for_inputs = torch.gather(
+                    input=lprobs, dim=-1, index=labels
+                ).squeeze(-1)
+                # adjust for length IPO style
+                avg_logp_completion = (lprobs_for_inputs * label_mask).sum(-1) / label_mask.sum(-1)
+                completion_lprob.append(avg_logp_completion.cpu().float().numpy())
             del out
 
-    return {k: np.vstack(v) for k, v in hidden_states.items()}
+    return {k: np.vstack(v) for k, v in hidden_states.items()}, np.vstack(completion_lprob)
 
 
 def project_onto_direction(H, direction):
