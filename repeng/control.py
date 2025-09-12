@@ -197,13 +197,57 @@ class ControlModule(torch.nn.Module):
         return output
 
 
-def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleList:
+def model_layer_list(model: ControlModel | PreTrainedModel, _recursive: bool=False) -> torch.nn.ModuleList:
+    """
+    Heuristics to find the actual layers to modify by repeng, depending
+    on the architecture.
+    """
     if isinstance(model, ControlModel):
         model = model.model
 
-    if hasattr(model, "model"):  # mistral-like
-        return model.model.layers
-    elif hasattr(model, "transformer"):  # gpt-2-like
-        return model.transformer.h
+    if _recursive:
+        if hasattr(model, "language_model"):  # gemmma3 like
+            layers = model.language_model.layers
+        elif hasattr(model, "layers"):  # qwen3-like
+            layers = model.layers
+        elif hasattr(model, "base_model"):  # mamba like
+            layers = model.base_model.layers
+        elif hasattr(model, "transformer"):  # gpt-2-like
+            layers = model.transformer.h
+        elif hasattr(model, "model"):  # mistral-like
+            layers = model.model.layers
+        else:
+            return False
+    elif not _recursive:
+        # heuristics were not enough, let's try harder
+        candidates = {}
+        for k, v in model.named_modules():
+            if v in candidates.values():  # module can appear multiple times
+                continue
+            if model_layer_list(v, _recursive=True):
+                candidates[k] = v
+
+        if len(candidates) == 1:  # gemma or mistral-like
+            good = model_layer_list(list(candidates.values())[0], _recursive=True)
+        else:
+            candidates2 = {}
+            for k, v in candidates.items():
+                if (
+                    "language" in (str(k) + str(v)).lower()
+                    or "text" in (str(k) + str(v)).lower()
+                ):
+                    candidates2[k] = v
+            if len(candidates2) == 1:
+                good = list(candidates2.values())[0]
+            elif "" in candidates:  # the default name module, if it works we take it
+                good = candidates[""]
+            else:
+                raise ValueError(f"Don't know how to get layer list for {type(model)}")
+        layers = model_layer_list(good, _recursive=True)
+        return layers
     else:
-        raise ValueError(f"don't know how to get layer list for {type(model)}")
+        raise ValueError(f"Don't know how to get layer list for {type(model)}")
+
+    assert layers, "No layers were found for the model"
+
+    return layers
