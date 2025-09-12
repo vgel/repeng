@@ -2,7 +2,7 @@ import dataclasses
 import os
 import typing
 import warnings
-
+from typing import Literal
 import gguf
 import numpy as np
 from sklearn.decomposition import PCA
@@ -238,6 +238,37 @@ class ControlVector:
 
     def __truediv__(self, other: int | float | np.number) -> "ControlVector":
         return self.__mul__(1 / other)
+    
+
+def PCAWeighted(train, weights, method: Literal['svd', 'eigen']= 'svd'):
+    """
+    https://stats.stackexchange.com/questions/113485/weighted-principal-components-analysis\
+    """
+    # Normalize weights
+    weights_flat = weights.flatten()
+    weights_norm = weights_flat / weights_flat.sum()
+    
+    # Weighted mean and centering
+    weighted_mean = np.average(train, axis=0, weights=weights_flat)
+    train_centered = train - weighted_mean
+
+    match method:
+        case 'eigen':            
+            # Weighted covariance
+            cov_matrix = (train_centered.T * weights_norm) @ train_centered
+            
+            # Get first PC via eigendecomposition
+            eigenvalues, eigenvectors = np.linalg.eigh(cov_matrix)
+            return eigenvectors[:, -1].astype(np.float32)
+        case 'svd':
+
+            # Apply sqrt of weights to data (for weighted SVD)
+            train_weighted = train_centered * np.sqrt(weights_norm).reshape(-1, 1)
+
+            # Use SVD instead of covariance + eigh
+            # This avoids forming the 4096×4096 covariance matrix
+            U, S, Vt = np.linalg.svd(train_weighted, full_matrices=False)
+            return Vt[0].astype(np.float32)  # first PC
 
 
 def read_representations(
@@ -268,8 +299,6 @@ def read_representations(
         model, tokenizer, train_strs, hidden_layers, batch_size
     )
 
-
-
     if transform_hiddens is not None:
         layer_hiddens = transform_hiddens(layer_hiddens)
 
@@ -296,13 +325,16 @@ def read_representations(
         else:
             raise ValueError("unknown method " + method)
 
-        # Importance Sampling, weight by completion likelihood to get online hidden states (rather than offline policy rollouts that are less relevant to the model)
-        train = train * weights  # Direct weighting to preserve relative importance
         if method != "umap":
-            # shape (1, n_features)
-            pca_model = PCA(n_components=1, whiten=False).fit(train)
-            # shape (n_features,)
-            directions[layer] = pca_model.components_.astype(np.float32).squeeze(axis=0)
+            if "weighted" in method:
+                # Experimental: Importance Sampling, weight by completion likelihood to get online hidden states (rather than offline policy rollouts that are less relevant to the model). See for example https://arxiv.org/abs/2410.04350 or https://www.research.ed.ac.uk/files/216243626/Importance_sampling_HANNA_DOA21122021_VOR_CC_BY.pdf
+                directions[layer] = PCAWeighted(train, weights.flatten())
+            else:
+                # shape (1, n_features)
+                pca_model = PCA(n_components=1, whiten=False).fit(train)
+                # shape (n_features,)
+                directions[layer] = pca_model.components_.astype(np.float32).squeeze(axis=0)
+
         else:
             # still experimental so don't want to add this as a real dependency yet
             import umap  # type: ignore
@@ -355,7 +387,7 @@ def batched_get_hiddens(
     with torch.no_grad():
         for batch in tqdm.tqdm(batched_inputs):
             # get the last token, handling right padding if present
-            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt", padding_side="left")
             encoded_batch = encoded_batch.to(model.device)
             out = model(**encoded_batch, output_hidden_states=True)
             attention_mask = encoded_batch["attention_mask"]
