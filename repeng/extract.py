@@ -244,8 +244,10 @@ def PCAWeighted(train, weights, method: Literal['svd', 'eigen']= 'svd'):
     """
     https://stats.stackexchange.com/questions/113485/weighted-principal-components-analysis\
     """
-    # Normalize weights
+
     weights_flat = weights.flatten()
+
+    # Normalize weights
     weights_norm = weights_flat / weights_flat.sum()
     
     # Weighted mean and centering
