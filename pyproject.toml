@@ -9,7 +9,7 @@ dependencies = [
     "numpy>=1.26.4",
     "scikit-learn>=1.4.0",
     "torch>=2.1.2",
-    "transformers>=4.36.2",
+    "transformers[torch]>4.51.0",
     "tqdm>=4.66.1",
     "gguf>=0.13.0",
 ]
