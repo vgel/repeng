@@ -308,12 +308,14 @@ def read_representations(
         h = layer_hiddens[layer]
         assert h.shape[0] == len(inputs) * 2
 
-        if method == "pca_diff":
+        if "pca_diff" in method:
+            # run PCA on difference vectors between positive and negative examples
             train = h[::2] - h[1::2]
             weights = (logps[::2] + logps[1::2]) / 2
             # Normalize to [0, 2] range with mean ≈ 1
             weights = (weights - weights.min()) / (weights.max() - weights.min()) * 2.0
-        elif method == "pca_center":
+        elif "pca_center" in method:
+            # run PCA on per-pair center. removes the "absolute position" of each pair, focusing on relative positioning
             center = (h[::2] + h[1::2]) / 2
             train = h
             train[::2] -= center
@@ -343,6 +345,7 @@ def read_representations(
             embedding = umap_model.fit_transform(train).astype(np.float32)
             directions[layer] = np.sum(train * embedding, axis=0) / np.sum(embedding)
 
+        # make sure the direction has positive personas as +ve (otherwise flip)
         # calculate sign
         projected_hiddens = project_onto_direction(h, directions[layer])
 
