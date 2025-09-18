@@ -170,10 +170,10 @@ class ControlModule(torch.nn.Module):
 
         # we should ignore the padding tokens when doing the activation addition
         # mask has ones for non padding tokens and zeros at padding tokens.
-        if ('attention_mask' in kwargs) and (kwargs['attention_mask'] is not None):
-            mask = kwargs['attention_mask']
-        else:
-            mask = 1.0
+        # if ('attention_mask' in kwargs) and (kwargs['attention_mask'] is not None):
+        #     mask = kwargs['attention_mask'].squeeze(0) # why 
+        # else:
+        mask = 1.0
 
         modified = self.params.operator(modified, control * mask)
 
