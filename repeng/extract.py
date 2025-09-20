@@ -41,7 +41,7 @@ class ControlVector:
             tokenizer (PreTrainedTokenizerBase): The tokenizer to tokenize the dataset.
             dataset (list[DatasetEntry]): The dataset used for training.
             **kwargs: Additional keyword arguments.
-                max_batch_size (int, optional): The maximum batch size for training.
+                batch_size (int, optional): The maximum batch size for training.
                     Defaults to 32. Try reducing this if you're running out of memory.
                 method (str, optional): The training method to use. Can be either
                     "pca_diff" or "pca_center". Defaults to "pca_diff".
