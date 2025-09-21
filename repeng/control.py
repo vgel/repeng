@@ -201,9 +201,13 @@ def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleLi
     if isinstance(model, ControlModel):
         model = model.model
 
-    if hasattr(model, "model"):  # mistral-like
-        return model.model.layers
-    elif hasattr(model, "transformer"):  # gpt-2-like
-        return model.transformer.h
-    else:
-        raise ValueError(f"don't know how to get layer list for {type(model)}")
+    target_suffixes = [
+    'model.layers',  # mistral, gemma, qwen,...
+    'model.transformer.h' # gpt-2
+    ]
+    for suffix in target_suffixes:
+        candidates = [v for k,v in model.named_modules() if k.endswith(suffix)]
+        if len(candidates)==1:
+            return candidates[0]
+
+    raise ValueError(f"don't know how to get layer list for {type(model)}")
