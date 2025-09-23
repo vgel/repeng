@@ -196,6 +196,13 @@ class ControlModule(torch.nn.Module):
 
         return output
 
+    def __getattr__(self, name: str) -> typing.Any:
+        if name in ("block", "params"):
+            # our properties - return normally
+            return super().__getattr__(name)
+        # delegate attr to wrapped module
+        return getattr(super().__getattr__("block"), name)
+
 
 def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleList:
     if isinstance(model, ControlModel):
