@@ -3,19 +3,14 @@ import json
 import pathlib
 import tempfile
 
+import pytest
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
 
 from . import ControlModel, ControlVector, DatasetEntry
 from .control import model_layer_list
 
 
-def test_layer_list():
-    _, gpt2 = load_gpt2_model()
-    assert len(model_layer_list(gpt2)) == 12
-    _, lts = load_llama_tinystories_model()
-    assert len(model_layer_list(lts)) == 4
-
-
+@pytest.mark.slow
 def test_round_trip_gguf():
     tokenizer, model = load_llama_tinystories_model()
     suffixes = load_suffixes()[:50]  # truncate to train vector faster
@@ -36,6 +31,7 @@ def test_round_trip_gguf():
         assert mushroom_cat_vector == read
 
 
+@pytest.mark.slow
 def test_train_gpt2():
     tokenizer, model = load_gpt2_model()
     suffixes = load_suffixes()[:50]  # truncate to train vector faster
@@ -81,6 +77,7 @@ def test_train_gpt2():
     assert sad == gen(-(happy_vector * 50))
 
 
+@pytest.mark.slow
 def test_train_llama_tinystories():
     tokenizer, model = load_llama_tinystories_model()
     suffixes = load_suffixes()[:50]  # truncate to train vector faster
@@ -117,6 +114,84 @@ def test_train_llama_tinystories():
     assert baseline.removeprefix(prompt) == " big, red"
     assert mushroom.removeprefix(prompt) == " small plant."
     assert cat.removeprefix(prompt) == " cat Bud guitar"
+
+
+@pytest.mark.slow
+def test_layer_list_real():
+    # test on some real models
+    _, gpt2 = load_gpt2_model()
+    assert len(model_layer_list(gpt2)) == 12
+    _, lts = load_llama_tinystories_model()
+    assert len(model_layer_list(lts)) == 4
+
+
+def test_layer_list_override():
+    import torch
+    from transformers.models.llama import LlamaForCausalLM, LlamaConfig
+
+    fake_layers = torch.nn.ModuleList([])
+    model = LlamaForCausalLM(
+        LlamaConfig(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    model.repeng_layers = fake_layers
+
+    layers = model_layer_list(model)
+    assert layers == fake_layers
+
+
+def test_layer_list_dummy_llama():
+    from transformers.models.llama import LlamaForCausalLM, LlamaConfig
+
+    model = LlamaForCausalLM(
+        LlamaConfig(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    layers = model_layer_list(model)
+    assert layers == model.model.layers
+
+
+def test_layer_list_dummy_mistral():
+    from transformers.models.mistral import MistralForCausalLM, MistralConfig
+
+    model = MistralForCausalLM(
+        MistralConfig(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    layers = model_layer_list(model)
+    assert layers == model.model.layers
+
+
+def test_layer_list_dummy_gemma():
+    from transformers.models.gemma import GemmaForCausalLM, GemmaConfig
+
+    model = GemmaForCausalLM(
+        GemmaConfig(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    layers = model_layer_list(model)
+    assert layers == model.model.layers
+
+
+def test_layer_list_dummy_qwen():
+    from transformers.models.qwen2 import Qwen2ForCausalLM, Qwen2Config
+
+    model = Qwen2ForCausalLM(
+        Qwen2Config(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    layers = model_layer_list(model)
+    assert layers == model.model.layers
+
+
+def test_attention_type_dummy_qwen():
+    # tests that 'attention_type' is forwarded through getattr correctly for
+    # qwen inference
+    import torch
+    from transformers.models.qwen2 import Qwen2ForCausalLM, Qwen2Config
+
+    model = Qwen2ForCausalLM(
+        Qwen2Config(vocab_size=100, hidden_size=32, intermediate_size=32)
+    )
+    model = ControlModel(model, list(range(32)))
+    assert model_layer_list(model)[15].attention_type == "full_attention"
+
+    model.forward(input_ids=torch.tensor([[0]], dtype=torch.long))
 
 
 ################################################################################
