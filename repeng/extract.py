@@ -12,12 +12,8 @@ import tqdm
 
 from .control import ControlModel, model_layer_list
 from .saes import Sae
+from .utils import DatasetEntry, get_model_name, autocorrect_chat_templates, get_num_hidden_layer
 
-
-@dataclasses.dataclass
-class DatasetEntry:
-    positive: str
-    negative: str
 
 
 @dataclasses.dataclass
@@ -255,14 +251,16 @@ def read_representations(
     Extract the representations based on the contrast dataset.
     """
     if not hidden_layers:
-        hidden_layers = range(-1, -model.config.num_hidden_layers, -1)
+        hidden_layers = list(range(get_num_hidden_layer(model)))
 
-    # normalize the layer indexes if they're negative
     n_layers = len(model_layer_list(model))
-    hidden_layers = [i if i >= 0 else n_layers + i for i in hidden_layers]
 
     # the order is [positive, negative, positive, negative, ...]
-    train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
+    train_strs = autocorrect_chat_templates(
+        messages=[s for ex in inputs for s in (ex.positive, ex.negative)],
+        tokenizer=tokenizer,
+        model=model,
+    )
 
     layer_hiddens = batched_get_hiddens(
         model, tokenizer, train_strs, hidden_layers, batch_size
@@ -273,7 +271,7 @@ def read_representations(
 
     # get directions for each layer using PCA
     directions: dict[int, np.ndarray] = {}
-    for layer in tqdm.tqdm(hidden_layers):
+    for layer in tqdm.tqdm(hidden_layers, desc="Altering directions"):
         h = layer_hiddens[layer]
         assert h.shape[0] == len(inputs) * 2
 
@@ -343,10 +341,9 @@ def batched_get_hiddens(
     ]
     hidden_states = {layer: [] for layer in hidden_layers}
     with torch.no_grad():
-        for batch in tqdm.tqdm(batched_inputs):
+        for batch in tqdm.tqdm(batched_inputs, desc="Computing activations"):
             # get the last token, handling right padding if present
-            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt")
-            encoded_batch = encoded_batch.to(model.device)
+            encoded_batch = tokenizer(batch, padding=True, return_tensors="pt").to(model.device)
             out = model(**encoded_batch, output_hidden_states=True)
             attention_mask = encoded_batch["attention_mask"]
             for i in range(len(batch)):

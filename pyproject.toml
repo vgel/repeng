@@ -12,7 +12,10 @@ dependencies = [
     "transformers>=4.36.2",
     "tqdm>=4.66.1",
     "gguf>=0.13.0",
+    "loguru>=0.7.3",
+
 ]
+
 
 [dependency-groups]
 dev = ["pytest>=8.0.2", "ruff>=0.8.3"]

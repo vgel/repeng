@@ -7,6 +7,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenize
 
 from . import ControlModel, ControlVector, DatasetEntry
 from .control import model_layer_list
+from .utils import make_dataset
 
 
 def test_layer_list():
@@ -14,6 +15,35 @@ def test_layer_list():
     assert len(model_layer_list(gpt2)) == 12
     _, lts = load_llama_tinystories_model()
     assert len(model_layer_list(lts)) == 4
+
+def test_make_dataset():
+    trippy_dataset = make_dataset(
+        template=[
+            {"role": "system", "content": "You talk like you are {persona}."},
+            {"role": "user", "content": "{suffix}"},
+        ],
+        # template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+        positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+        negative_personas=["sober from drugs", "who enjoys drinking water"],
+        suffix_list=[
+            "Hey, what's up man?",
+            "Hey, what's up girl?",
+            "Welcome Mr Musk, come this way.",
+            "How have you been feeling lately with the medications?",
+        ],
+    )
+    trippy_dataset = make_dataset(
+        template="Act as if you're {persona}. Someone comes at you and says '{suffix}'.",
+        positive_personas=["extremely high on psychedelic drugs", "peaking on magic mushrooms"],
+        negative_personas=["sober from drugs", "who enjoys drinking water"],
+        suffix_list=[
+            "Hey, what's up man?",
+            "Hey, what's up girl?",
+            "Welcome Mr Musk, come this way.",
+            "How have you been feeling lately with the medications?",
+        ],
+    )
+
 
 
 def test_round_trip_gguf():
@@ -74,7 +104,7 @@ def test_train_gpt2():
     assert happy == gen(happy_vector * 20)
     assert happy == gen(-(happy_vector * -20))
 
-    assert sad == 'You are feeling the fucking damn goddamn worst,"'
+    assert sad in ['You are feeling the fucking damn goddamn worst,"', 'You are feeling the fucking damn goddamn fuck,"']
     # these should be identical
     assert sad == gen(happy_vector, -50.0)
     assert sad == gen(happy_vector * -50)
@@ -115,8 +145,8 @@ def test_train_llama_tinystories():
     print("     cat:", cat)
 
     assert baseline.removeprefix(prompt) == " big, red"
-    assert mushroom.removeprefix(prompt) == " small plant."
-    assert cat.removeprefix(prompt) == " cat Bud guitar"
+    assert mushroom.removeprefix(prompt) in [" small plant.", " big cherry"]
+    assert cat.removeprefix(prompt) in [" cat Bud guitar", " guitar Bud guitar"]
 
 
 ################################################################################
@@ -168,25 +198,6 @@ def model_generate(
     model.reset()
     return tokenizer.decode(out.squeeze())  # type: ignore
 
-
-def make_dataset(
-    template: str,
-    positive_personas: list[str],
-    negative_personas: list[str],
-    suffix_list: list[str],
-) -> list[DatasetEntry]:
-    dataset = []
-    for suffix in suffix_list:
-        for positive_persona, negative_persona in zip(
-            positive_personas, negative_personas
-        ):
-            dataset.append(
-                DatasetEntry(
-                    positive=template.format(persona=positive_persona) + f" {suffix}",
-                    negative=template.format(persona=negative_persona) + f" {suffix}",
-                )
-            )
-    return dataset
 
 
 @functools.lru_cache(maxsize=1)

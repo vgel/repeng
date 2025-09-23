@@ -5,6 +5,8 @@ import warnings
 import torch
 from transformers import PretrainedConfig, PreTrainedModel
 
+from repeng.utils import get_num_hidden_layer
+
 if typing.TYPE_CHECKING:
     from .extract import ControlVector
 
@@ -16,20 +18,68 @@ class ControlModel(torch.nn.Module):
     A wrapped language model that can have controls set on its layers with `self.set_control`.
     """
 
-    def __init__(self, model: PreTrainedModel, layer_ids: typing.Iterable[int]):
+    def __init__(
+        self,
+        model: PreTrainedModel,
+        layer_ids: typing.Optional[typing.Iterable[int]]=None,
+        layer_zones: typing.Optional[typing.Iterable[float]]=None,
+    ):
         """
         **This mutates the wrapped `model`! Be careful using `model` after passing it to this class.**
 
         Build a new ControlModel around a model instance, initializing control on
-        the layers specified in `layer_ids`.
+        the layers specified in `layer_ids` or `layer_zones`.
+
+        To control layers #3 and 5, use layer_ids=[3,5].
+        To control layers by their relative depth, use layer_zones=[[0.1, 0.5]] to
+            control the layers with depth between 10% and 50% (left inclusive). you
+            can specify multiple zones but no overlapping nor empty zones are allowed.
         """
+
+        assert (layer_ids or layer_zones) and not (layer_ids and layer_zones), "Must supply either layer_ids or layer_zones argument"
 
         super().__init__()
         self.model = model
 
+        # Get the number of layers
+        layer_ids = list(range(get_num_hidden_layer(model)))
+        nlayers = len(layer_ids)
+
+        if layer_zones:
+            self.layer_ids = []
+            for start_zone, end_zone in layer_zones:
+                assert (
+                    start_zone < end_zone
+                    and start_zone >= 0
+                    and start_zone <= 1
+                    and end_zone >= 0
+                    and end_zone <= 1
+                ), "wrong layer_zones format"
+                if end_zone != 1.0:
+                    new_layers = [
+                        ilayer
+                        for ilayer in layer_ids
+                        if start_zone <= (ilayer / nlayers) < end_zone
+                    ]
+                else:  # trick to make sure to include the last layers if desired
+                    new_layers = [
+                        ilayer
+                        for ilayer in layer_ids
+                        if start_zone <= (ilayer / nlayers)
+                    ]
+                assert new_layers, f"No layers found in zone {start_zone} to {end_zone}"
+                assert not any(nl in self.layer_ids for nl in new_layers), "Overlapping zones found"
+                self.layer_ids.extend(new_layers)
+        else:
+            # remap to make sure they are not negative
+            self.layer_ids = layer_ids
+
+        assert self.layer_ids, "No layers to control"
+
         layers = model_layer_list(model)
-        self.layer_ids = [i if i >= 0 else len(layers) + i for i in layer_ids]
-        for layer_id in layer_ids:
+        assert len(layers) == len(layer_ids)
+
+        for layer_id in self.layer_ids:
             layer = layers[layer_id]
             if not isinstance(layer, ControlModule):
                 layers[layer_id] = ControlModule(layer)
@@ -164,7 +214,8 @@ class ControlModule(torch.nn.Module):
         assert len(control.shape) == len(modified.shape)
         control = control.to(modified.device)
 
-        norm_pre = torch.norm(modified, dim=-1, keepdim=True)
+        if self.params.normalize:
+            norm_pre = torch.norm(modified, dim=-1, keepdim=True)
 
         # we should ignore the padding tokens when doing the activation addition
         # mask has ones for non padding tokens and zeros at padding tokens.
@@ -180,10 +231,10 @@ class ControlModule(torch.nn.Module):
                 .reshape(target_shape[0], target_shape[1], 1)
             )
             mask = mask.to(modified.dtype).to(modified.device)
+            modified = self.params.operator(modified, control * mask)
         else:
-            mask = 1.0
+            modified = self.params.operator(modified, control)
 
-        modified = self.params.operator(modified, control * mask)
 
         if self.params.normalize:
             norm_post = torch.norm(modified, dim=-1, keepdim=True)
@@ -201,9 +252,15 @@ def model_layer_list(model: ControlModel | PreTrainedModel) -> torch.nn.ModuleLi
     if isinstance(model, ControlModel):
         model = model.model
 
-    if hasattr(model, "model"):  # mistral-like
-        return model.model.layers
+    if hasattr(model, "language_model"):  # gemmma3 like
+        layers = model.language_model.layers
+    elif hasattr(model, "layers"):  # qwen3-like
+        layers = model.layers
+    elif hasattr(model, "base_model"):  # mamba like
+        layers = model.base_model.layers
     elif hasattr(model, "transformer"):  # gpt-2-like
-        return model.transformer.h
+        layers = model.transformer.h
+    elif hasattr(model, "model"):  # mistral-like
+        layers = model.model.layers
     else:
         raise ValueError(f"don't know how to get layer list for {type(model)}")
