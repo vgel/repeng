@@ -3,11 +3,13 @@ import json
 import pathlib
 import tempfile
 
+import numpy as np
 import pytest
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
 
 from . import ControlModel, ControlVector, DatasetEntry
 from .control import model_layer_list
+from .extract import batched_get_hiddens
 
 
 @pytest.mark.slow
@@ -123,6 +125,26 @@ def test_layer_list_real():
     assert len(model_layer_list(gpt2)) == 12
     _, lts = load_llama_tinystories_model()
     assert len(model_layer_list(lts)) == 4
+
+
+@pytest.mark.slow
+@pytest.mark.filterwarnings("ignore:invalid value")  # all-zeros is degenerate
+def test_hook_compute_hiddens():
+    tokenizer, model = load_llama_tinystories_model()
+    suffixes = load_suffixes()[:2]
+    dataset = make_dataset("{persona}", ["a"], ["b"], suffixes)
+
+    def compute_hiddens(model, tokenizer, train_strs, hidden_layers, batch_size):
+        h = batched_get_hiddens(model, tokenizer, train_strs, hidden_layers, batch_size)
+        return {k: np.zeros_like(v) for k, v in h.items()}
+
+    cvec = ControlVector.train(
+        model, tokenizer, dataset, compute_hiddens=compute_hiddens
+    )
+    assert len(cvec.directions) == 3
+    for v in cvec.directions.values():
+        assert v[0] == 1.0
+        assert (v[1:] == 0.0).all()
 
 
 def test_layer_list_override():
