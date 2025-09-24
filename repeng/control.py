@@ -166,24 +166,7 @@ class ControlModule(torch.nn.Module):
 
         norm_pre = torch.norm(modified, dim=-1, keepdim=True)
 
-        # we should ignore the padding tokens when doing the activation addition
-        # mask has ones for non padding tokens and zeros at padding tokens.
-        # only tested this on left padding
-        if "position_ids" in kwargs:
-            pos = kwargs["position_ids"]
-            zero_indices = (pos == 0).cumsum(1).argmax(1, keepdim=True)
-            col_indices = torch.arange(pos.size(1), device=pos.device).unsqueeze(0)
-            target_shape = modified.shape
-            mask = (
-                (col_indices >= zero_indices)
-                .float()
-                .reshape(target_shape[0], target_shape[1], 1)
-            )
-            mask = mask.to(modified.dtype).to(modified.device)
-        else:
-            mask = 1.0
-
-        modified = self.params.operator(modified, control * mask)
+        modified = self.params.operator(modified, control)
 
         if self.params.normalize:
             norm_post = torch.norm(modified, dim=-1, keepdim=True)
