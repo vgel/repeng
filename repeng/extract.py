@@ -45,6 +45,10 @@ class ControlVector:
                     Defaults to 32. Try reducing this if you're running out of memory.
                 method (str, optional): The training method to use. Can be either
                     "pca_diff" or "pca_center". Defaults to "pca_diff".
+                compute_hiddens (Callable, optional): Override hidden state computation.
+                    See signature of `read_representations`.
+                transform_hiddens (Callable, optional): Transform the hidden states after
+                    they are computed. See signature of `read_representations`.
 
         Returns:
             ControlVector: The trained vector.
@@ -240,6 +244,17 @@ class ControlVector:
         return self.__mul__(1 / other)
 
 
+class ComputeHiddens(typing.Protocol):
+    def __call__(
+        self,
+        model: "PreTrainedModel | ControlModel",
+        tokenizer: PreTrainedTokenizerBase,
+        train_strs: list[str],
+        hidden_layers: list[int],
+        batch_size: int,
+    ) -> dict[int, np.ndarray]: ...
+
+
 def read_representations(
     model: "PreTrainedModel | ControlModel",
     tokenizer: PreTrainedTokenizerBase,
@@ -247,6 +262,7 @@ def read_representations(
     hidden_layers: typing.Iterable[int] | None = None,
     batch_size: int = 32,
     method: typing.Literal["pca_diff", "pca_center", "umap"] = "pca_diff",
+    compute_hiddens: ComputeHiddens | None = None,
     transform_hiddens: (
         typing.Callable[[dict[int, np.ndarray]], dict[int, np.ndarray]] | None
     ) = None,
@@ -264,9 +280,18 @@ def read_representations(
     # the order is [positive, negative, positive, negative, ...]
     train_strs = [s for ex in inputs for s in (ex.positive, ex.negative)]
 
-    layer_hiddens = batched_get_hiddens(
-        model, tokenizer, train_strs, hidden_layers, batch_size
-    )
+    if compute_hiddens is None:
+        layer_hiddens = batched_get_hiddens(
+            model, tokenizer, train_strs, hidden_layers, batch_size
+        )
+    else:
+        layer_hiddens = compute_hiddens(
+            model=model,
+            tokenizer=tokenizer,
+            train_strs=train_strs,
+            hidden_layers=hidden_layers,
+            batch_size=batch_size,
+        )
 
     if transform_hiddens is not None:
         layer_hiddens = transform_hiddens(layer_hiddens)
